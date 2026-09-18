@@ -25,7 +25,9 @@ Numerical confidence will require calibration against independently labeled data
 - `data/`: ignored local execution artifacts.
 - Frontend: issue, patch, evidence, and final verification views.
 
-Only API liveness and a frontend connection screen are implemented.
+API liveness and an interactive frontend with sample reports and session-only
+submission drafts are implemented. GitHub OAuth connects the frontend to public repository and open-PR metadata.
+Repository checkout and the evaluation runner are not implemented.
 The database is provisioned locally but has no schema or application integration yet.
 
 ## Execution isolation
@@ -52,3 +54,13 @@ on valid patches. Include human-reviewed labels and reproducible evidence.
 3. Add isolated execution with baseline comparisons and saved stdout/stderr.
 4. Add hidden-test execution and test-integrity checks.
 5. Build report views and a small reproducible benchmark before learned models.
+
+## GitHub authentication boundary
+
+The API owns the OAuth client secret, PKCE verifier, access token, and expiring
+session data. The browser receives only an opaque HttpOnly cookie and public
+profile/repository metadata. OAuth flows are bound to a random browser cookie and
+consumed once; sign-out requires a same-origin custom-header request. Authenticated
+API responses are marked no-store. Public-only filtering also applies to PR access.
+The process-local session store is suitable only for this single-worker development
+scaffold; deployment requires a shared expiring store and HTTPS.
