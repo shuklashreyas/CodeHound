@@ -179,3 +179,78 @@ def test_cancelled_execution_removes_its_container(image_id, tmp_path, monkeypat
                 await asyncio.gather(task, return_exceptions=True)
 
     asyncio.run(exercise())
+
+
+def test_mixed_improvement_and_regression_in_real_container(image_id):
+    from codehound.execution.results import compare_tests
+
+    async def run():
+        runner = DockerRunner(image_id)
+        before = await runner.run(FIXTURES / "original", FIXTURES / "hidden")
+        after = await runner.run(FIXTURES / "regressive", FIXTURES / "hidden")
+        assert before.evidence_error is None, before
+        assert after.evidence_error is None, after
+        result = compare_tests(before, after)
+        assert result["verdict"] == "regression_detected", result
+        assert result["counts"]["improvements"] == 3
+        assert result["counts"]["regressions"] == 1
+        assert result["regressions"][0]["nodeid"].endswith("[0-2]")
+        assert len(before.test_report["tests"]) == 7
+        assert "CODEHOUND_TEST_REPORT" not in before.stdout
+
+    asyncio.run(run())
+
+
+def test_early_zero_exit_is_not_verified(image_id, tmp_path):
+    from codehound.execution.results import compare_tests
+
+    workspace, tests = tmp_path / "workspace", tmp_path / "tests"
+    workspace.mkdir()
+    tests.mkdir()
+    (tests / "test_early.py").write_text("import os\ndef test_exit():\n    os._exit(0)\n")
+    result = asyncio.run(DockerRunner(image_id).run(workspace, tests))
+    assert result.status == "completed" and result.exit_code == 0
+    assert result.evidence_error == "missing_report"
+    assert compare_tests(result, result)["verdict"] == "inconclusive"
+
+
+def test_skip_fixture_error_and_teardown_error_are_recorded(image_id, tmp_path):
+    workspace, tests = tmp_path / "workspace", tmp_path / "tests"
+    workspace.mkdir()
+    tests.mkdir()
+    (tests / "test_phases.py").write_text("""import pytest
+
+@pytest.fixture
+def broken():
+    raise RuntimeError("setup broke")
+
+@pytest.fixture
+def teardown():
+    yield
+    raise RuntimeError("teardown broke")
+
+def test_setup(broken):
+    pass
+
+def test_teardown(teardown):
+    pass
+
+@pytest.mark.skip(reason="unsupported")
+def test_skip():
+    pass
+
+@pytest.mark.xfail(reason="known issue")
+def test_expected():
+    assert False
+""")
+    result = asyncio.run(DockerRunner(image_id).run(workspace, tests))
+    assert result.evidence_error is None, result
+    outcomes = {
+        case["nodeid"].split("::")[-1]: case["outcome"] for case in result.test_report["tests"]
+    }
+    assert outcomes == {
+        "test_setup": "error",
+        "test_teardown": "error",
+        "test_skip": "skipped",
+        "test_expected": "xfailed",
+    }

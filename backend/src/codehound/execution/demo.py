@@ -6,20 +6,32 @@ import json
 from pathlib import Path
 
 from codehound.execution.docker import DockerRunner
+from codehound.execution.results import compare_tests, summarize_comparisons
 
 
 async def run_demo(image_id: str, fixtures: Path):
     runner = DockerRunner(image_id)
     evidence = {}
-    for variant in ("original", "correct", "overfit"):
+    runs = {}
+    for variant in ("original", "correct", "overfit", "regressive"):
         evidence[variant] = {}
+        runs[variant] = {}
         for suite in ("visible", "hidden"):
             result = await runner.run(fixtures / variant, fixtures / suite)
             evidence[variant][suite] = result.to_dict()
+            runs[variant][suite] = result
+    comparisons = {}
+    for variant in ("correct", "overfit", "regressive"):
+        suites = {
+            suite: {"test_comparison": compare_tests(runs["original"][suite], result)}
+            for suite, result in runs[variant].items()
+        }
+        comparisons[variant] = {"suites": suites, "assessment": summarize_comparisons(suites)}
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "fixture": "pagination",
         "execution_evidence": evidence,
+        "comparisons": comparisons,
         "limitations": [
             "Public, intentionally constructed fixture; not a benchmark score.",
             "Process exit codes do not prove resistance to malicious test interference.",
