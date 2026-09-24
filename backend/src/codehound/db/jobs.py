@@ -1,14 +1,39 @@
 """Durable execution queue with owner scoping, claims, cancellation, and crash recovery."""
 
+import os
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import JSON, case, delete, literal, select, update
+from sqlalchemy import JSON, case, delete, func, literal, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
 from codehound.db.models import ExecutionJob, ExecutionNamespace, Verification, WorkerHeartbeat
 from codehound.db.store import StoreConflict
+
+
+class QueueCapacity(Exception):
+    """A bounded queue has no capacity for another execution."""
+
+
+class QueueConfiguration(Exception):
+    pass
+
+
+def queue_limits():
+    values = []
+    for key, default, maximum in (
+        ("CODEHOUND_MAX_PENDING_PER_ACCOUNT", "5", 100),
+        ("CODEHOUND_MAX_PENDING_EXECUTIONS", "50", 1000),
+    ):
+        try:
+            value = int(os.getenv(key, default))
+            if not 1 <= value <= maximum:
+                raise ValueError
+        except ValueError:
+            raise QueueConfiguration("Execution queue capacity is misconfigured.") from None
+        values.append(value)
+    return values
 
 
 class JobStore:
@@ -51,8 +76,18 @@ class JobStore:
             )
 
     def enqueue(self, verification_id, owner_id, profile, image_id, key=None):
+        account_limit, total_limit = queue_limits()
+        self.reap()
         now = datetime.now(UTC)
         with Session(self.engine, expire_on_commit=False) as db:
+            # Serialize admission so simultaneous requests cannot overfill the queue.
+            # This lock covers only the short database transaction, never execution.
+            if self.engine.dialect.name == "postgresql":
+                db.execute(text("SELECT pg_advisory_xact_lock(704001726)"))
+            elif self.engine.dialect.name == "sqlite":
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            else:
+                raise QueueConfiguration("Execution queue requires SQLite or PostgreSQL.")
             record = db.scalar(
                 select(Verification).where(
                     Verification.id == verification_id, Verification.owner_id == owner_id
@@ -73,6 +108,24 @@ class JobStore:
                 raise StoreConflict("Capture PR evidence before starting execution.")
             if profile.repository.casefold() != record.repository.casefold():
                 raise StoreConflict("This test profile does not cover the submitted repository.")
+            if db.scalar(select(ExecutionJob.id).where(ExecutionJob.active_key == verification_id)):
+                raise StoreConflict(
+                    "An execution is already queued or running for this verification."
+                )
+            active = ExecutionJob.status.in_(("queued", "running"))
+            account_count = db.scalar(
+                select(func.count())
+                .select_from(ExecutionJob)
+                .where(active, ExecutionJob.owner_id == owner_id)
+            )
+            if account_count >= account_limit:
+                raise QueueCapacity(
+                    "Your account's execution queue is full. "
+                    "Wait for a run or cancel a queued execution."
+                )
+            total_count = db.scalar(select(func.count()).select_from(ExecutionJob).where(active))
+            if total_count >= total_limit:
+                raise QueueCapacity("The execution queue is full. Please try again later.")
             job = ExecutionJob(
                 id=str(uuid4()),
                 verification_id=verification_id,

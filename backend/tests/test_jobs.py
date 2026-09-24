@@ -264,3 +264,28 @@ def test_worker_presence_is_reported_and_removed(ready):
     assert store.worker_online()
     store.worker_stopped(worker_id)
     assert not store.worker_online()
+
+
+def test_queue_capacity_http_response_keeps_existing_retries_working(ready, monkeypatch):
+    from codehound.db.jobs import QueueCapacity, QueueConfiguration
+
+    client, identifier, store, _ = ready
+    original = JobStore.enqueue
+
+    def full(*args, **kwargs):
+        raise QueueCapacity("Execution queue is full.")
+
+    monkeypatch.setattr(JobStore, "enqueue", full)
+    response = enqueue(ready)
+    assert response.status_code == 429 and response.headers["Retry-After"] == "30"
+
+    def invalid(*args, **kwargs):
+        raise QueueConfiguration("Execution queue capacity is misconfigured.")
+
+    monkeypatch.setattr(JobStore, "enqueue", invalid)
+    assert enqueue(ready).status_code == 503
+    monkeypatch.setattr(JobStore, "enqueue", original)
+    monkeypatch.setenv("CODEHOUND_MAX_PENDING_PER_ACCOUNT", "1")
+    key = str(uuid4())
+    assert enqueue(ready, key).status_code == 202
+    assert enqueue(ready, key).status_code == 200

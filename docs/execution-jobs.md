@@ -66,7 +66,14 @@ and a valid origin.
 
 Queueing returns 202 and a Location header. An optional UUID `Idempotency-Key`
 allows safe retries; an identical repeat returns 200 and the original job. At most
-one job may be queued/running per verification. Another account receives 404 for
+one job may be queued/running per verification. Admission is also bounded to 5
+queued/running jobs per account and 50 total by default. A full queue returns 429
+with `Retry-After: 30`; an idempotent retry still returns its existing job.
+`CODEHOUND_MAX_PENDING_PER_ACCOUNT` (1–100) and
+`CODEHOUND_MAX_PENDING_EXECUTIONS` (1–1000) configure these limits. Admission is
+serialized within a short database transaction, so concurrent requests cannot
+exceed the limits. Completed/cancelled/expired jobs release capacity. These are
+backlog bounds, not request-rate or disk quotas. Another account receives 404 for
 all detail, list, cancel, profile, and export routes.
 
 Jobs move through `queued → running → completed/failed/cancelled`. `completed`
@@ -92,6 +99,6 @@ global safety guarantee.
 
 Sessions remain process-local, so run one API worker. The queue can use multiple
 execution workers, each processing one job at a time. Dedicated disk quotas,
-request/account quotas, and deployment hardening are still required before public
+request-rate and storage quotas, and deployment hardening are still required before public
 production use. Claim-aware [orphan recovery](worker-recovery.md) now handles aged
 resources owned by expired jobs; it is not a storage quota.

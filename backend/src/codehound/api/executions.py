@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from codehound.api.verifications import principal, store, write_access
-from codehound.db.jobs import JobStore
+from codehound.db.jobs import JobStore, QueueCapacity, QueueConfiguration
 from codehound.db.store import StoreConflict
 from codehound.evaluation.job_schemas import (
     ExecutionCreate,
@@ -82,6 +82,10 @@ def enqueue(
             image,
             str(idempotency_key) if idempotency_key else None,
         )
+    except QueueCapacity as exc:
+        raise HTTPException(429, str(exc), headers={"Retry-After": "30"}) from exc
+    except QueueConfiguration as exc:
+        raise HTTPException(503, str(exc)) from exc
     except StoreConflict as exc:
         raise HTTPException(409, str(exc)) from exc
     if job is None:

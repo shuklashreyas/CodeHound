@@ -92,5 +92,5 @@ agent performance. Numerical confidence requires independent calibration data.
 1. Gather human-reviewed real agent patches and held-out evaluation tasks.
 2. Add operator-owned profiles for more repository contracts and languages.
 3. Broaden structural integrity and static analysis beyond Python AST inspection.
-4. Harden worker storage quotas, account quotas, and deployment isolation.
+4. Harden worker storage quotas, request-rate limits, and deployment isolation.
 5. Compare stronger baselines and calibrate learned evaluators only with sufficient data.
