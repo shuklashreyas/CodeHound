@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "name": "refresh-independent",
+  "module": "tokens",
+  "function": "can_refresh",
+  "cases": [
+    {
+      "id": "different-expired-session",
+      "args": [
+        10,
+        100,
+        20
+      ],
+      "expect": {
+        "kind": "value",
+        "value": true
+      }
+    },
+    {
+      "id": "session-boundary",
+      "args": [
+        50,
+        100,
+        50
+      ],
+      "expect": {
+        "kind": "value",
+        "value": true
+      }
+    },
+    {
+      "id": "refresh-boundary",
+      "args": [
+        100,
+        50,
+        50
+      ],
+      "expect": {
+        "kind": "value",
+        "value": false
+      }
+    },
+    {
+      "id": "both-expired",
+      "args": [
+        10,
+        20,
+        30
+      ],
+      "expect": {
+        "kind": "value",
+        "value": false
+      }
+    },
+    {
+      "id": "last-valid-tick",
+      "args": [
+        10,
+        100,
+        99
+      ],
+      "expect": {
+        "kind": "value",
+        "value": true
+      }
+    },
+    {
+      "id": "expired-refresh-live-session",
+      "args": [
+        100,
+        30,
+        31
+      ],
+      "expect": {
+        "kind": "value",
+        "value": false
+      }
+    }
+  ]
+}

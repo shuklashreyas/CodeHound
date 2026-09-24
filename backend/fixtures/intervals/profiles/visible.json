@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "name": "interval-visible",
+  "module": "intervals",
+  "function": "merge_intervals",
+  "cases": [
+    {
+      "id": "issue-example",
+      "args": [
+        [
+          [
+            1,
+            3
+          ],
+          [
+            2,
+            4
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            4
+          ]
+        ]
+      }
+    },
+    {
+      "id": "disjoint",
+      "args": [
+        [
+          [
+            1,
+            2
+          ],
+          [
+            4,
+            5
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            2
+          ],
+          [
+            4,
+            5
+          ]
+        ]
+      }
+    }
+  ]
+}

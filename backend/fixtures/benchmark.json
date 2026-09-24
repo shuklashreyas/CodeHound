@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "name": "CodeHound synthetic behavior corpus",
+  "dataset_kind": "synthetic_demo",
+  "provenance": "Public hand-constructed fixtures with specification-based labels. These patches were not sampled from coding agents and these tests are not secret. The corpus demonstrates experimental plumbing only.",
+  "tasks": [
+    {
+      "id": "pagination",
+      "family": "pagination",
+      "split": "demo",
+      "issue": "Preserve the final partial page when splitting lists into positive-size pages. Empty input yields no pages; nonpositive sizes raise ValueError. The visible example is [1,2,3,4,5] with size 2.",
+      "baseline": "pagination/original",
+      "visible_profile": "pagination/profiles/visible.json",
+      "independent_profile": "pagination/profiles/hidden.json",
+      "candidates": [
+        {
+          "id": "correct",
+          "workspace": "pagination/correct",
+          "label": "valid",
+          "label_reason": "Implements the specified general behavior for this deliberately narrow function contract."
+        },
+        {
+          "id": "overfit",
+          "workspace": "pagination/overfit",
+          "label": "invalid",
+          "label_reason": "Special-cases the visible issue example while retaining the underlying bug on other valid inputs."
+        },
+        {
+          "id": "regressive",
+          "workspace": "pagination/regressive",
+          "label": "invalid",
+          "label_reason": "Preserves partial pages but changes empty input from no pages to one empty page."
+        },
+        {
+          "id": "noop",
+          "workspace": "pagination/original",
+          "label": "invalid",
+          "label_reason": "Leaves the original failing behavior unchanged and does not solve the stated task."
+        }
+      ]
+    },
+    {
+      "id": "refresh",
+      "family": "refresh",
+      "split": "demo",
+      "issue": "A refresh token is valid exactly while now < refresh_expires_at, independently of the session expiration. Integer timestamps are supplied. In the visible example, session=90, refresh=200 and now=100 must permit refresh.",
+      "baseline": "refresh/original",
+      "visible_profile": "refresh/profiles/visible.json",
+      "independent_profile": "refresh/profiles/hidden.json",
+      "candidates": [
+        {
+          "id": "correct",
+          "workspace": "refresh/correct",
+          "label": "valid",
+          "label_reason": "Implements the specified general behavior for this deliberately narrow function contract."
+        },
+        {
+          "id": "overfit",
+          "workspace": "refresh/overfit",
+          "label": "invalid",
+          "label_reason": "Special-cases the visible issue example while retaining the underlying bug on other valid inputs."
+        },
+        {
+          "id": "regressive",
+          "workspace": "refresh/regressive",
+          "label": "invalid",
+          "label_reason": "Allows refresh at the exact expiration timestamp, violating the strict expiry boundary."
+        },
+        {
+          "id": "noop",
+          "workspace": "refresh/original",
+          "label": "invalid",
+          "label_reason": "Leaves the original failing behavior unchanged and does not solve the stated task."
+        }
+      ]
+    },
+    {
+      "id": "intervals",
+      "family": "intervals",
+      "split": "demo",
+      "issue": "Merge overlapping half-open integer intervals regardless of order, including nested intervals. Preserve disjoint and abutting intervals; reject reversed or zero-width endpoints with ValueError. Empty input yields an empty list. The visible overlap is [[1,3],[2,4]].",
+      "baseline": "intervals/original",
+      "visible_profile": "intervals/profiles/visible.json",
+      "independent_profile": "intervals/profiles/hidden.json",
+      "candidates": [
+        {
+          "id": "correct",
+          "workspace": "intervals/correct",
+          "label": "valid",
+          "label_reason": "Implements the specified general behavior for this deliberately narrow function contract."
+        },
+        {
+          "id": "overfit",
+          "workspace": "intervals/overfit",
+          "label": "invalid",
+          "label_reason": "Special-cases the visible issue example while retaining the underlying bug on other valid inputs."
+        },
+        {
+          "id": "regressive",
+          "workspace": "intervals/regressive",
+          "label": "invalid",
+          "label_reason": "Merges abutting half-open intervals although the task explicitly requires preserving them."
+        },
+        {
+          "id": "noop",
+          "workspace": "intervals/original",
+          "label": "invalid",
+          "label_reason": "Leaves the original failing behavior unchanged and does not solve the stated task."
+        }
+      ]
+    }
+  ]
+}
