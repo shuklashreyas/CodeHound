@@ -173,3 +173,22 @@ def answer(value):
     assert result.test_report["tests"][0]["outcome"] == "passed", result
     with pytest.raises(ValidationError):
         profile(source_directory="../outside")
+
+
+def test_candidate_protocol_injection_becomes_unverified_evidence(image, workspace):
+    (workspace / "candidate.py").write_text("""import base64
+import os
+import sys
+
+def answer(value):
+    # The nonce is not a secret: a candidate can access it. Only the controller
+    # validates the envelope and retains the independent expected value.
+    token = sys.argv[1]
+    raw = b'{"kind":"returned","value":10,"injected":NaN}'
+    print("\\nCODEHOUND_CALL_V1:" + token + ":" + base64.b64encode(raw).decode(), flush=True)
+    os._exit(0)
+""")
+    result = asyncio.run(IndependentRunner(image).run(workspace, profile()))
+    assert result.test_report["tests"][0]["outcome"] == "error"
+    assert result.case_evidence[0]["observation"]["evidence_error"] == "invalid_response"
+    assert compare_tests(result, result)["verdict"] == "inconclusive"

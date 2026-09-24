@@ -98,3 +98,17 @@ multi-step scenarios require additional adapters.
 Docker provides the process/filesystem boundary, not a formal security guarantee.
 Untrusted workloads still require hardened, dedicated production workers. The
 legacy pytest mode remains available and is explicitly labeled as in-process.
+
+## Malformed candidate output
+
+Candidate responses must match one exact envelope: returned value, raised exception,
+or adapter error. Unknown fields, duplicate JSON keys, non-finite numbers (including
+numeric overflow), invalid Unicode, and nesting beyond 64 levels are rejected.
+Malformed output becomes an execution error and an inconclusive comparison; it
+cannot become a passing assertion. The legacy pytest report decoder uses the same
+strict JSON parser and rejects unexpected report fields.
+
+The transport nonce is a frame identifier, **not a secret or authenticity proof**.
+Candidate code can print a frame. The independent protection is that the controller
+retains expected answers and judges the returned observable data outside that
+process. Passing a known input still does not rule out hardcoding or overfitting.
