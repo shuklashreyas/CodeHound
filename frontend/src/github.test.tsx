@@ -149,3 +149,14 @@ describe("Repository session expiry", () => {
     expect(screen.getByRole("alert").textContent).toContain("Session expired");
   });
 });
+
+it("preserves a saved verification ID in the sign-in link without arbitrary destinations", async () => {
+  const { githubLoginUrl } = await import("./github");
+  const id = "ed4b9ad8-4529-4bd7-83cc-5268fd6dfdb9";
+  expect(
+    githubLoginUrl(`?verification=${id}&return_to=https://evil.example`),
+  ).toBe(`/api/auth/github/login?verification=${id}`);
+  expect(githubLoginUrl("?verification=https://evil.example")).toBe(
+    "/api/auth/github/login",
+  );
+});

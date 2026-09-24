@@ -6,6 +6,7 @@ import os
 import secrets
 import time
 from urllib.parse import urlencode
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -94,18 +95,32 @@ def get_session(request: Request):
     }
 
 
+def frontend_return(config, verification=None, **parameters):
+    # Only an opaque UUID survives OAuth. Never accept an arbitrary redirect URL.
+    if verification:
+        parameters["verification"] = str(UUID(verification))
+    return f"{config['origin']}/?{urlencode(parameters)}"
+
+
 @router.get("/auth/github/login")
-def login():
+def login(verification: UUID | None = None):
     config = settings()
+    destination = str(verification) if verification else None
     if not config["client_id"] or not config["client_secret"]:
-        return RedirectResponse(f"{config['origin']}/?auth_error=not_configured", status_code=303)
+        return RedirectResponse(
+            frontend_return(config, destination, auth_error="not_configured"), status_code=303
+        )
     prune()
     if len(flows) >= 1000:
         raise HTTPException(503, "Too many pending sign-ins. Try again later.")
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=")
-    flows[state] = {"verifier": verifier, "expires": time.time() + FLOW_TTL}
+    flows[state] = {
+        "verifier": verifier,
+        "expires": time.time() + FLOW_TTL,
+        "verification": destination,
+    }
     query = urlencode(
         {
             "client_id": config["client_id"],
@@ -139,7 +154,9 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
         return RedirectResponse(f"{config['origin']}/?auth_error=expired", status_code=303)
 
     def failed(reason):
-        result = RedirectResponse(f"{config['origin']}/?auth_error={reason}", status_code=303)
+        result = RedirectResponse(
+            frontend_return(config, flow.get("verification"), auth_error=reason), status_code=303
+        )
         result.delete_cookie(FLOW_COOKIE, path="/")
         return result
 
@@ -191,7 +208,9 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
     sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
     session_id = secrets.token_urlsafe(32)
     sessions[session_id] = {"token": token, "user": user, "expires": time.time() + lifetime}
-    result = RedirectResponse(f"{config['origin']}/?github=connected", status_code=303)
+    result = RedirectResponse(
+        frontend_return(config, flow.get("verification"), github="connected"), status_code=303
+    )
     cookie(result, SESSION_COOKIE, session_id, lifetime)
     result.delete_cookie(FLOW_COOKIE, path="/")
     return result

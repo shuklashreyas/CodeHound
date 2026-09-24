@@ -152,6 +152,18 @@ export function GitHubAccount({
   );
 }
 
+export function githubLoginUrl(search = window.location.search) {
+  const verification = new URLSearchParams(search).get("verification");
+  const identifier =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return (
+    "/api/auth/github/login" +
+    (verification && identifier.test(verification)
+      ? `?verification=${encodeURIComponent(verification)}`
+      : "")
+  );
+}
+
 export function GitHubRepositories({
   auth,
   onSelect,
@@ -285,9 +297,7 @@ export function GitHubRepositories({
           </p>
           <a
             className={`button primary ${!auth.session?.configured ? "unavailable" : ""}`}
-            href={
-              auth.session?.configured ? "/api/auth/github/login" : undefined
-            }
+            href={auth.session?.configured ? githubLoginUrl() : undefined}
             aria-disabled={!auth.session?.configured}
           >
             Continue with GitHub ↗

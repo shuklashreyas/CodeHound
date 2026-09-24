@@ -114,3 +114,20 @@ it("shows an owner-scoped restore error instead of displaying a different saved 
   );
   expect(screen.queryByText("Saved evidence saved-one")).toBeNull();
 });
+
+it("restores the saved verification after the OAuth return", async () => {
+  window.history.replaceState(
+    null,
+    "",
+    "/?github=connected&verification=saved-one",
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((path: string) =>
+      response(path === "/api/auth/session" ? session : { items: [saved] }),
+    ),
+  );
+  render(<App />);
+  await screen.findByText("Saved evidence saved-one");
+  expect(window.location.search).toBe("?verification=saved-one");
+});
