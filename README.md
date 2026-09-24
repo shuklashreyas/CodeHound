@@ -22,6 +22,8 @@ execution, hidden tests, patch integrity checks, and repository context.
 - **Execution jobs:** persistent queue, progress, cancellation, worker leases, and evidence exports.
 - **Independent JSON evaluator:** expected answers and assertions stay outside candidate
   containers; supports operator-defined Python function profiles.
+- **Structural test review:** inspect removed tests, changed assertions and new skip
+  markers in changed Python test files without importing candidate code.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
   fix passes visible tests but fails independent cases.
 

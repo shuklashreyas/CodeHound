@@ -15,6 +15,7 @@ from codehound.db.store import StoreConflict, VerificationStore
 from codehound.evaluation.registry import EvaluationProfile
 from codehound.execution.docker import control
 from codehound.execution.independent import IndependentRunner
+from codehound.execution.integrity import analyze_test_integrity
 from codehound.execution.verify import verify_snapshot
 from codehound.repositories.checkout import CheckoutFailure
 
@@ -57,6 +58,7 @@ async def execute_job(job, database, executor=verify_snapshot):
             IndependentRunner(job.image_id),
             mode="independent",
             on_progress=progress,
+            integrity_analyzer=analyze_test_integrity,
         )
     artifact["profile"] = profile.public()
     return artifact

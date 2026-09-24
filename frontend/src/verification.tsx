@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./github";
+import { IntegrityEvidence } from "./integrity";
+import type { IntegrityResult } from "./integrity";
 
 type Profile = {
   id: string;
@@ -40,7 +42,11 @@ type Job = {
   assessment: { verdict: string; signals: string[] } | null;
   failure: Failure | null;
   created_at: string;
-  artifact?: { suites: Record<string, Suite>; limitations: string[] } | null;
+  artifact?: {
+    suites: Record<string, Suite>;
+    limitations: string[];
+    test_integrity?: IntegrityResult | null;
+  } | null;
 };
 type Report = {
   id: string;
@@ -88,6 +94,7 @@ const verdicts: Record<string, string> = {
 const stages: Record<string, string> = {
   queued: "Waiting for a worker",
   checkout: "Checking out both revisions",
+  test_integrity: "Inspecting changes to test structure",
   visible_baseline: "Running visible checks · baseline",
   visible_candidate: "Running visible checks · candidate",
   hidden_baseline: "Running independent checks · baseline",
@@ -554,6 +561,11 @@ export function Verification({
                         ([name, suite]) => (
                           <SuiteEvidence key={name} name={name} suite={suite} />
                         ),
+                      )}
+                      {job.artifact.test_integrity && (
+                        <IntegrityEvidence
+                          result={job.artifact.test_integrity}
+                        />
                       )}
                       <ul className="evidence-limitations">
                         {job.artifact.limitations.map((item) => (
