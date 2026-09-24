@@ -254,3 +254,78 @@ def test_expected():
         "test_skip": "skipped",
         "test_expected": "xfailed",
     }
+
+
+def test_control_command_output_is_streamed_with_a_retention_cap(monkeypatch):
+    import sys
+
+    from codehound.execution import docker
+
+    real_spawn = asyncio.create_subprocess_exec
+    processes = []
+
+    async def spawn(*args, **kwargs):
+        # A trusted test helper stands in for the Docker CLI, never candidate source.
+        process = await real_spawn(
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.write('a' * 500000); sys.stderr.write('b' * 500000)",
+            **kwargs,
+        )
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    code, stdout, stderr = asyncio.run(docker.control("inspect", "test"))
+    assert code == 0 and stdout == b"a" * 8192 and stderr == b"b" * 8192
+    assert processes[0].returncode == 0
+
+
+def test_control_timeout_terminates_the_cli_process(monkeypatch):
+    import sys
+
+    from codehound.execution import docker
+
+    real_spawn = asyncio.create_subprocess_exec
+    processes = []
+
+    async def spawn(*args, **kwargs):
+        process = await real_spawn(sys.executable, "-c", "import time; time.sleep(60)", **kwargs)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    with pytest.raises(TimeoutError):
+        asyncio.run(docker.control("inspect", "test", timeout=0.05))
+    assert processes[0].returncode is not None
+
+
+def test_control_cancellation_drains_noisy_pipes_and_reaps_process(monkeypatch):
+    import sys
+
+    from codehound.execution import docker
+
+    real_spawn = asyncio.create_subprocess_exec
+    processes = []
+
+    async def spawn(*args, **kwargs):
+        process = await real_spawn(
+            sys.executable,
+            "-c",
+            "import os\nwhile True:\n os.write(1,b'x'*8192)\n os.write(2,b'y'*8192)",
+            **kwargs,
+        )
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+
+    async def run():
+        task = asyncio.create_task(docker.control("inspect", "test"))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 2)
+        assert processes[0].returncode is not None
+
+    asyncio.run(run())

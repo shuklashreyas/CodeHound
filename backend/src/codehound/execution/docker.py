@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import time
+from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from uuid import uuid4
@@ -62,14 +63,36 @@ async def control(*args, timeout=15):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+
+    async def drain(stream):
+        retained = bytearray()
+        while chunk := await stream.read(8192):
+            retained.extend(chunk[: max(0, 8192 - len(retained))])
+        return bytes(retained)
+
+    readers = [
+        asyncio.create_task(drain(process.stdout)),
+        asyncio.create_task(drain(process.stderr)),
+    ]
+    waiter = asyncio.create_task(process.wait())
+    finished = asyncio.gather(waiter, *readers)
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
-    except BaseException:
+        _, stdout, stderr = await asyncio.wait_for(asyncio.shield(finished), timeout)
+        return process.returncode, stdout, stderr
+    finally:
         if process.returncode is None:
-            process.kill()
-        await process.wait()
-        raise
-    return process.returncode, stdout[:8192], stderr[:8192]
+            with suppress(ProcessLookupError):
+                process.kill()
+        # Drain both pipes after termination; cancelling readers first can leave
+        # process.wait() blocked on a full pipe transport.
+        with suppress(Exception):
+            await asyncio.wait_for(asyncio.shield(finished), timeout=5)
+        for task in [waiter, *readers]:
+            if not task.done():
+                task.cancel()
+        if not finished.done():
+            finished.cancel()
+        await asyncio.gather(waiter, *readers, finished, return_exceptions=True)
 
 
 class ContainerRunner:
