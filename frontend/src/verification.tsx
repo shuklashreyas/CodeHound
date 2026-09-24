@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./github";
+import { ImpactEvidence } from "./impact";
+import type { PythonImpact } from "./impact";
 import { Requirements } from "./requirements";
 import type { RequirementEvidence } from "./requirements";
 import { IntegrityEvidence } from "./integrity";
@@ -49,6 +51,7 @@ type Job = {
     limitations: string[];
     test_integrity?: IntegrityResult | null;
     requirement_evidence?: RequirementEvidence;
+    python_impact?: PythonImpact | null;
   } | null;
 };
 type Report = {
@@ -98,6 +101,7 @@ const stages: Record<string, string> = {
   queued: "Waiting for a worker",
   checkout: "Checking out both revisions",
   test_integrity: "Inspecting changes to test structure",
+  repository_impact: "Inspecting Python imports and syntax",
   visible_baseline: "Running visible checks · baseline",
   visible_candidate: "Running visible checks · candidate",
   hidden_baseline: "Running independent checks · baseline",
@@ -564,6 +568,9 @@ export function Verification({
                         ([name, suite]) => (
                           <SuiteEvidence key={name} name={name} suite={suite} />
                         ),
+                      )}
+                      {job.artifact.python_impact && (
+                        <ImpactEvidence result={job.artifact.python_impact} />
                       )}
                       {job.artifact.requirement_evidence && (
                         <Requirements

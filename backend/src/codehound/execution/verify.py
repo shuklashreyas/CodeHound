@@ -57,6 +57,7 @@ async def verify_snapshot(
     mode="pytest",
     on_progress=None,
     integrity_analyzer=None,
+    impact_analyzer=None,
 ):
     if mode not in ("pytest", "independent"):
         raise ValueError("Unsupported evaluator mode.")
@@ -86,6 +87,7 @@ async def verify_snapshot(
     }
     results = {}
     integrity = None
+    impact = None
     if on_progress:
         await on_progress("checkout")
     async with workspace_factory(
@@ -95,6 +97,10 @@ async def verify_snapshot(
             if on_progress:
                 await on_progress("test_integrity")
             integrity = await integrity_analyzer(snapshot, checkouts, runner.image_id)
+        if impact_analyzer is not None:
+            if on_progress:
+                await on_progress("repository_impact")
+            impact = await impact_analyzer(snapshot, checkouts, runner.image_id)
         for name, tests in suites.items():
             if on_progress:
                 await on_progress(f"{name}_baseline")
@@ -120,6 +126,7 @@ async def verify_snapshot(
         "diff_sha256": snapshot["diff_sha256"],
         "suites": results,
         "test_integrity": integrity,
+        "python_impact": impact,
         "assessment": summarize_comparisons(results),
         "confidence": None,
         "limitations": [
@@ -144,6 +151,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--inspect-tests", action="store_true")
+    parser.add_argument("--inspect-python", action="store_true")
     parser.add_argument("--mode", choices=("pytest", "independent"), default="pytest")
     args = parser.parse_args()
     if args.output.exists():
@@ -156,6 +164,7 @@ def main():
     suites = {"visible": args.visible_tests}
     if args.hidden_tests:
         suites["hidden"] = args.hidden_tests
+    from codehound.execution.impact import analyze_python_impact
     from codehound.execution.integrity import analyze_test_integrity
 
     result = asyncio.run(
@@ -165,6 +174,7 @@ def main():
             runner,
             mode=args.mode,
             integrity_analyzer=analyze_test_integrity if args.inspect_tests else None,
+            impact_analyzer=analyze_python_impact if args.inspect_python else None,
         )
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
