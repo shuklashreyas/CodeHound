@@ -19,11 +19,16 @@ execution, hidden tests, patch integrity checks, and repository context.
   Versioned Alembic migrations run at API startup.
 - **Restricted Python execution:** a standalone Docker runner with CPU, memory,
   process, time, and output limits, plus independent read-only tests.
-- **Execution jobs:** persistent queue, progress, cancellation, worker leases, and evidence exports.
+- **Execution jobs:** persistent queue, progress, cancellation, worker leases,
+  claim-aware crash recovery, and evidence exports.
 - **Independent JSON evaluator:** expected answers and assertions stay outside candidate
   containers; supports operator-defined Python function profiles.
 - **Structural test review:** inspect removed tests, changed assertions and new skip
   markers in changed Python test files without importing candidate code.
+- **Requirement evidence:** operator-defined requirements mapped to before/after
+  test outcomes, with missing coverage kept explicit.
+- **Python impact:** differential syntax checks and bounded static import trails
+  identifying possible downstream files.
 - **Benchmark runner:** a labeled 12-patch synthetic corpus, visible-only vs independent
   decisions, false-positive counts, split-aware metrics, and atomic evidence checkpoints.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
@@ -33,8 +38,8 @@ The signed-in dashboard connects the full flow: **capture PR → select an opera
 profile → run both revisions → compare evidence**. It shows live progress,
 cancellation, execution history, changed files, per-case outcomes, and JSON exports.
 The separate worker executes code; the web/API process queues jobs. Repositories
-without an operator-owned profile cannot run yet. The bundled CodeHound profile
-checks only PR URL parsing, not entire PR correctness.
+without an operator-owned profile cannot run yet. The bundled CodeHound profiles
+check PR URL parsing and comparison-verdict aggregation, not entire PR correctness.
 A `ready` intake record means evidence was captured, not that the patch is correct.
 Unexecuted checks remain `not_run`, and confidence is unscored.
 
@@ -44,13 +49,14 @@ Unexecuted checks remain `not_run`, and confidence is unscored.
 backend/
   src/codehound/
     api/             Authentication, repositories, verifications, health
-    core/            Request limits
+    core/            Request limits and execution resource identity
     db/              Models, transactions, and schema migrations
     repositories/    URL validation, bounded GitHub intake, disposable Git checkouts
-    evaluation/      Submission and report contracts
-    execution/       Restricted Docker runner, revision comparison, fixture demo
+    evaluation/      Operator profiles, requirements, report contracts
+    execution/       Docker execution, comparison, source inspection, worker
+    benchmark/       Labeled experiment manifests, runner, and metrics
   tests/             Unit and integration tests
-  fixtures/          Original, correct, and overfit pagination examples
+  fixtures/          Pagination, refresh-token, and interval benchmark examples
   test-environments/ Trusted execution image definitions
 frontend/
   src/               React dashboard and GitHub connection views
@@ -238,8 +244,6 @@ test profiles and gather human-reviewed real agent patches. The
 [benchmark runner](docs/benchmark.md) provides reproducible experiment plumbing; its
 public synthetic corpus does not establish real-world detection performance.
 
-Worker containers and checkouts use claim-aware crash recovery. See [worker recovery](docs/worker-recovery.md) for ownership rules and the dry-run cleanup command.
-
-Profiles can map explicit requirements to execution cases. The dashboard shows before/after [requirement evidence](docs/requirement-evidence.md), including requirements with no mapped checks, without claiming full issue coverage.
-
-Queued jobs also perform bounded [Python syntax and import-impact analysis](docs/python-impact.md), retaining baseline and candidate dependency trails to guide regression testing.
+Further implementation details: [worker recovery](docs/worker-recovery.md),
+[requirement evidence](docs/requirement-evidence.md), and
+[Python syntax/import impact](docs/python-impact.md).
