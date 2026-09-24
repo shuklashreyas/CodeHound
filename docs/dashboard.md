@@ -62,3 +62,8 @@ Temporary evidence-loading failures (network errors, rate limits, or server erro
 retry up to four times with increasing delays. These are read-only requests;
 execution submissions are never automatically retried. Permanent errors keep the
 manual **Refresh evidence** action available.
+
+The **Check coverage** page separates implemented, scoped evidence from planned
+evaluators. These are product capability labels, not results for the selected PR.
+Repository entries link to saved verification status instead of claiming every
+saved record is an unfetched draft.

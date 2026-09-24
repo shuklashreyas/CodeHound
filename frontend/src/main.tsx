@@ -4,6 +4,7 @@ import "./styles.css";
 import { GitHubAccount, GitHubRepositories, useGitHub, api } from "./github";
 
 import { Verification } from "./verification";
+import { implementedCoverage } from "./coverage";
 
 import { checks, sample, tabs } from "./report-data";
 import type { Status, Run, Tab } from "./report-data";
@@ -1033,11 +1034,13 @@ export function App() {
                         <small>
                           {r.sample
                             ? "Illustrative repository"
-                            : "Draft · not fetched"}
+                            : r.persisted
+                              ? "Saved verification · open for current status"
+                              : "Local draft · not captured"}
                         </small>
                       </span>
                       <span className="pill">
-                        {r.sample ? "SAMPLE" : "DRAFT"}
+                        {r.sample ? "SAMPLE" : r.persisted ? "SAVED" : "DRAFT"}
                       </span>
                       <Icon name="arrow" />
                     </button>
@@ -1057,9 +1060,10 @@ export function App() {
               <div className="notice">
                 <Icon name="info" />
                 <span>
-                  <strong>The verification roadmap.</strong> These checks
-                  describe the intended evaluator. None are connected to a live
-                  runner yet.
+                  <strong>Current capabilities and remaining work.</strong> Live
+                  runs produce scoped evidence for the checks below.
+                  Availability does not mean a patch passed; inspect each run's
+                  coverage and results.
                 </span>
               </div>
               <div className="coverage-grid">
@@ -1069,10 +1073,18 @@ export function App() {
                       <span className="coverage-number">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <Badge status="Not run" />
+                      <span className="pill">
+                        {implementedCoverage[c.name]
+                          ? "Scoped evidence"
+                          : "Planned"}
+                      </span>
                     </div>
                     <h3>{c.name}</h3>
                     <p>{c.description}</p>
+                    <p className="coverage-implementation">
+                      {implementedCoverage[c.name] ||
+                        "No dedicated evaluator for this dimension is implemented yet. Saved runs keep it unverified."}
+                    </p>
                   </section>
                 ))}
               </div>
