@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from uuid import uuid4
 
+from codehound.core.execution_scope import current_scope
 from codehound.execution.results import PREFIX, decode_report
 
 
@@ -110,6 +111,10 @@ class ContainerRunner:
             "--mount",
             f"type=bind,src={mount_path(workspace)},dst=/workspace,readonly",
         ]
+        scope = current_scope.get()
+        if scope:
+            for key, value in scope.labels().items():
+                args.extend(["--label", f"{key}={value}"])
         for source, destination in mounts:
             args.extend(
                 ["--mount", f"type=bind,src={mount_path(source)},dst={destination},readonly"]

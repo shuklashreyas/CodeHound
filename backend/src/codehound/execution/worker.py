@@ -9,10 +9,12 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from starlette.concurrency import run_in_threadpool
 
+from codehound.core.execution_scope import ExecutionScope, execution_scope
 from codehound.db.database import Database
 from codehound.db.jobs import JobStore
 from codehound.db.store import StoreConflict, VerificationStore
 from codehound.evaluation.registry import EvaluationProfile
+from codehound.execution.cleanup import reconcile
 from codehound.execution.docker import control
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.integrity import analyze_test_integrity
@@ -51,15 +53,17 @@ async def execute_job(job, database, executor=verify_snapshot):
     async def progress(stage):
         await run_in_threadpool(store.progress, job.id, job.claim_token, stage)
 
-    async with asyncio.timeout(600):
-        artifact = await executor(
-            snapshot,
-            suites,
-            IndependentRunner(job.image_id),
-            mode="independent",
-            on_progress=progress,
-            integrity_analyzer=analyze_test_integrity,
-        )
+    namespace = await run_in_threadpool(store.namespace)
+    with execution_scope(ExecutionScope(namespace, job.id, job.claim_token)):
+        async with asyncio.timeout(600):
+            artifact = await executor(
+                snapshot,
+                suites,
+                IndependentRunner(job.image_id),
+                mode="independent",
+                on_progress=progress,
+                integrity_analyzer=analyze_test_integrity,
+            )
     artifact["profile"] = profile.public()
     return artifact
 
@@ -147,17 +151,31 @@ async def run_worker(database, stop, *, once=False):
                 except TimeoutError:
                     pass
 
+    async def maintenance():
+        while not stop.is_set():
+            await run_in_threadpool(store.reap)
+            report = await reconcile(store, apply=True)
+            if report["errors"]:
+                logger.warning("Resource cleanup could not complete; it will retry.")
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=60)
+            except TimeoutError:
+                pass
+
     pulse = asyncio.create_task(heartbeat())
     consumer = asyncio.create_task(consume())
+    janitor = asyncio.create_task(maintenance())
     try:
-        done, _ = await asyncio.wait([pulse, consumer], return_when=asyncio.FIRST_COMPLETED)
+        done, _ = await asyncio.wait(
+            [pulse, consumer, janitor], return_when=asyncio.FIRST_COMPLETED
+        )
         for task in done:
             await task
     finally:
-        for task in (pulse, consumer):
+        for task in (pulse, consumer, janitor):
             if not task.done():
                 task.cancel()
-        await asyncio.gather(pulse, consumer, return_exceptions=True)
+        await asyncio.gather(pulse, consumer, janitor, return_exceptions=True)
         await run_in_threadpool(store.worker_stopped, worker_id)
 
 

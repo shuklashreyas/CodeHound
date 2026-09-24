@@ -237,3 +237,5 @@ See [architecture and remaining boundaries](docs/architecture.md) and the
 test profiles and gather human-reviewed real agent patches. The
 [benchmark runner](docs/benchmark.md) provides reproducible experiment plumbing; its
 public synthetic corpus does not establish real-world detection performance.
+
+Worker containers and checkouts use claim-aware crash recovery. See [worker recovery](docs/worker-recovery.md) for ownership rules and the dry-run cleanup command.

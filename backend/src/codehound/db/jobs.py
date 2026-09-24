@@ -7,7 +7,7 @@ from sqlalchemy import JSON, case, delete, literal, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
-from codehound.db.models import ExecutionJob, Verification, WorkerHeartbeat
+from codehound.db.models import ExecutionJob, ExecutionNamespace, Verification, WorkerHeartbeat
 from codehound.db.store import StoreConflict
 
 
@@ -304,6 +304,27 @@ class JobStore:
                     select(WorkerHeartbeat.id)
                     .where(WorkerHeartbeat.last_seen > datetime.now(UTC) - timedelta(seconds=30))
                     .limit(1)
+                )
+                is not None
+            )
+
+    def namespace(self):
+        with Session(self.engine) as db:
+            value = db.scalar(select(ExecutionNamespace.value).where(ExecutionNamespace.id == 1))
+            if value is None:
+                raise RuntimeError("Execution namespace migration is required.")
+            return value
+
+    def claim_is_live(self, identifier, token):
+        with Session(self.engine) as db:
+            return (
+                db.scalar(
+                    select(ExecutionJob.id).where(
+                        ExecutionJob.id == identifier,
+                        ExecutionJob.claim_token == token,
+                        ExecutionJob.status == "running",
+                        ExecutionJob.lease_until > datetime.now(UTC),
+                    )
                 )
                 is not None
             )
