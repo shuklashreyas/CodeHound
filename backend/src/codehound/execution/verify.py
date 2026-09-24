@@ -49,7 +49,14 @@ def comparison(baseline, candidate):
 
 
 async def verify_snapshot(
-    snapshot, suites, runner, *, workspace_factory=GitWorkspace, mode="pytest", on_progress=None
+    snapshot,
+    suites,
+    runner,
+    *,
+    workspace_factory=GitWorkspace,
+    mode="pytest",
+    on_progress=None,
+    integrity_analyzer=None,
 ):
     if mode not in ("pytest", "independent"):
         raise ValueError("Unsupported evaluator mode.")
@@ -78,11 +85,16 @@ async def verify_snapshot(
         for name, path in suites.items()
     }
     results = {}
+    integrity = None
     if on_progress:
         await on_progress("checkout")
     async with workspace_factory(
         reference.repository, snapshot["base_sha"], snapshot["head_sha"]
     ) as checkouts:
+        if integrity_analyzer is not None:
+            if on_progress:
+                await on_progress("test_integrity")
+            integrity = await integrity_analyzer(snapshot, checkouts, runner.image_id)
         for name, tests in suites.items():
             if on_progress:
                 await on_progress(f"{name}_baseline")
@@ -107,6 +119,7 @@ async def verify_snapshot(
         "head_sha": snapshot["head_sha"],
         "diff_sha256": snapshot["diff_sha256"],
         "suites": results,
+        "test_integrity": integrity,
         "assessment": summarize_comparisons(results),
         "confidence": None,
         "limitations": [
@@ -130,6 +143,7 @@ def main():
     parser.add_argument("--image-id", required=True)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--inspect-tests", action="store_true")
     parser.add_argument("--mode", choices=("pytest", "independent"), default="pytest")
     args = parser.parse_args()
     if args.output.exists():
@@ -142,7 +156,17 @@ def main():
     suites = {"visible": args.visible_tests}
     if args.hidden_tests:
         suites["hidden"] = args.hidden_tests
-    result = asyncio.run(verify_snapshot(snapshot, suites, runner, mode=args.mode))
+    from codehound.execution.integrity import analyze_test_integrity
+
+    result = asyncio.run(
+        verify_snapshot(
+            snapshot,
+            suites,
+            runner,
+            mode=args.mode,
+            integrity_analyzer=analyze_test_integrity if args.inspect_tests else None,
+        )
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x") as output:
         json.dump(result, output, indent=2)

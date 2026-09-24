@@ -97,3 +97,50 @@ def test_pinned_comparison_uses_same_tests_and_cleans_up(github_bundle, tmp_path
             verify_snapshot(snapshot, {"visible": tmp_path}, Runner(), workspace_factory=Workspace)
         )
     assert len(calls) == 3
+
+
+def test_integrity_runs_inside_pinned_workspace_before_tests(github_bundle, tmp_path):
+    snapshot = asyncio.run(
+        collect_snapshot(parse_pull_url("https://github.com/octocat/project/pull/7"), github_bundle)
+    )
+    (tmp_path / "test_example.py").write_text("def test_example(): pass")
+    stages = []
+    closed = []
+
+    class Workspace:
+        def __init__(self, *_):
+            pass
+
+        async def __aenter__(self):
+            return Checkouts(Path("base"), Path("head"), snapshot["base_sha"], snapshot["head_sha"])
+
+        async def __aexit__(self, *_):
+            closed.append(True)
+
+    class Runner:
+        image_id = RESULT.image_id
+
+        async def run(self, *_):
+            return run_result(0)
+
+    async def inspect(captured, checkouts, image):
+        assert captured == snapshot and checkouts.candidate == Path("head")
+        assert image == RESULT.image_id and not closed
+        return {"status": "inconclusive", "findings": [], "unverified": [{"reason": "timeout"}]}
+
+    async def progress(stage):
+        stages.append(stage)
+
+    artifact = asyncio.run(
+        verify_snapshot(
+            snapshot,
+            {"visible": tmp_path},
+            Runner(),
+            workspace_factory=Workspace,
+            integrity_analyzer=inspect,
+            on_progress=progress,
+        )
+    )
+    assert closed and artifact["test_integrity"]["status"] == "inconclusive"
+    assert artifact["suites"]["visible"]["comparison"] == "no_behavior_change_observed"
+    assert stages == ["checkout", "test_integrity", "visible_baseline", "visible_candidate"]

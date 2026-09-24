@@ -21,7 +21,9 @@ Drafts, intake, queued execution, cancellation, and results are persisted. The
 execution API accepts only a matching operator-owned profile ID. A separate worker
 claims jobs with expiring leases and keeps assertions outside candidate containers.
 The frontend connects this flow and keeps its illustrative sample separate from real execution evidence. None of these components implements a
-calibrated ML judge, static analyzer, or semantic requirement verifier yet.
+calibrated ML judge, general static analyzer, or semantic requirement verifier yet.
+Changed Python test structure is inspected in an isolated parser; see
+[test-integrity.md](test-integrity.md).
 
 ## Components
 
@@ -82,8 +84,8 @@ calibration against independently labeled data.
 
 ## Next milestones
 
-1. Broaden independently controlled repository profiles and benchmark patch detection.
+1. Build a reproducible labeled benchmark and compare visible-only detection.
 2. Add operator-owned profiles for more repository contracts.
-3. Add structural integrity analysis and static-analysis results.
+3. Broaden structural integrity coverage and add general static-analysis results.
 4. Harden worker storage quotas, account quotas, and orphan cleanup.
 5. Build a labeled benchmark before training learned evaluators.

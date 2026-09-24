@@ -96,3 +96,18 @@ def execution_checks(checks, job):
         if regressions
         else "No regressions observed in configured checks. Untested behavior remains unverified."
     )
+
+    integrity = job.artifact.get("test_integrity")
+    if integrity and integrity["status"] != "not_applicable":
+        check = by_name["test_integrity"]
+        count = len(integrity["findings"])
+        uncertain = len(integrity["unverified"])
+        if count:
+            check.status = "needs_review"
+        elif integrity["status"] == "inconclusive":
+            check.status = "inconclusive"
+        check.explanation = (
+            f"Structural inspection of {integrity['files_examined']} changed Python test files: "
+            f"{count} review findings, {uncertain} unverified inspections. "
+            "These are source-level hints, not proof of assertion strength or intent."
+        )
