@@ -12,23 +12,25 @@ GitHub OAuth → public repository / PR selection
                         ↓ explicit intake API call
           immutable PR evidence + review observations
 
-captured PR → pinned Git workspaces → baseline/candidate Docker tests → JSON comparison
+captured PR → durable execution job → worker → pinned Git workspaces
+           → baseline/candidate Docker tests → stored comparison evidence
 trusted fixture code + independent tests → restricted Docker runner → JSON evidence
 ```
 
-The draft/intake flow is persisted. The operator comparison CLI connects checkout
-and execution; this is not yet a queued web evaluation job. The frontend clearly labels its sample
-report and keeps saved drafts unexecuted. None of these components implements a
+Drafts, intake, queued execution, cancellation, and results are persisted. The
+execution API accepts only a matching operator-owned profile ID. A separate worker
+claims jobs with expiring leases and keeps assertions outside candidate containers.
+The frontend still needs controls for this flow and clearly labels its sample report. None of these components implements a
 calibrated ML judge, static analyzer, or semantic requirement verifier yet.
 
 ## Components
 
 - `api`: authentication, owner-scoped verification endpoints, readiness.
-- `db`: SQLAlchemy storage, Alembic migrations, short transactions, intake leases.
+- `db`: SQLAlchemy storage, migrations, short transactions, intake/execution leases.
 - `repositories`: strict URL validation, bounded GitHub requests, snapshot capture,
   and temporary Git workspaces pinned to exact commits.
 - `evaluation`: submission/report contracts and explicit unrun check states.
-- `execution`: operator-controlled Python Docker runner, baseline comparison CLI, and fixture demo.
+- `execution`: independent evaluator, restricted Docker runner, worker, comparison CLI.
 - `data/`: ignored local SQLite database and local evidence files.
 
 SQLite keeps development usable without Docker. Compose uses PostgreSQL. Execution
@@ -54,8 +56,8 @@ can interrupt cleanup; production workers also need orphan-container reconciliat
 
 Python under test still shares a process with pytest. It can attempt to manipulate
 the test framework or terminate the process. Exit codes and logs are evidence, not
-proof against adversarial code. The optional JSON function evaluator keeps assertions and expected answers
-outside the candidate container. Its narrower contract and remaining limits are
+proof against adversarial code. The JSON function evaluator keeps assertions and
+expected answers outside the candidate container. Its narrower contract and remaining limits are
 documented in `independent-evaluator.md`; arbitrary pytest does not gain that boundary.
 
 ## Authentication
@@ -80,8 +82,8 @@ calibration against independently labeled data.
 
 ## Next milestones
 
-1. Queue evaluation jobs and connect checkout, trusted environments, and execution.
-2. Persist original/candidate test evidence with baseline comparisons and retries.
-3. Add structural test-integrity analysis and actual static-analysis results.
-4. Populate the dashboard from real reports, including progress and failure states.
+1. Connect the dashboard to intake and queued execution with real evidence.
+2. Add operator-owned profiles for more repository contracts.
+3. Add structural integrity analysis and static-analysis results.
+4. Harden worker storage quotas, account quotas, and orphan cleanup.
 5. Build a labeled benchmark before training learned evaluators.

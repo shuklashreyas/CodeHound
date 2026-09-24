@@ -19,6 +19,7 @@ execution, hidden tests, patch integrity checks, and repository context.
   Versioned Alembic migrations run at API startup.
 - **Restricted Python execution:** a standalone Docker runner with CPU, memory,
   process, time, and output limits, plus independent read-only tests.
+- **Execution jobs:** persistent queue, progress, cancellation, worker leases, and evidence exports.
 - **Independent JSON evaluator:** expected answers and assertions stay outside candidate
   containers; supports operator-defined Python function profiles.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
@@ -26,7 +27,8 @@ execution, hidden tests, patch integrity checks, and repository context.
 
 The web dashboard does **not** launch repository code. Snapshot intake is available
 through the API. A standalone comparison command connects pinned checkouts to
-independent tests; queued web execution and execution persistence are still future work.
+independent tests. Queued execution and persistent results are available through
+the API and separate worker.
 A `ready` intake record means evidence was captured, not that the patch is correct.
 Unexecuted checks remain `not_run`, and confidence is unscored.
 
@@ -205,6 +207,9 @@ For stronger assertion isolation, use [independent JSON evaluation](docs/indepen
 with `--mode independent` and operator-owned JSON profiles. This mode judges
 observed values outside candidate containers and does not mount expected answers.
 
+For saved PR runs, follow [execution worker setup and API](docs/execution-jobs.md).
+Only repositories with a matching operator-owned profile can be evaluated.
+
 ## Development checks
 
 ```sh
@@ -222,5 +227,5 @@ enable actual container tests. CI runs PostgreSQL and Docker integration jobs as
 well as frontend tests and the production build.
 
 See [architecture and remaining boundaries](docs/architecture.md). Next: connect
-pinned checkout, trusted test environments, execution persistence, and the UI into
-a queued evaluation pipeline.
+the dashboard to intake and queued execution, and broaden independently retained
+test profiles.

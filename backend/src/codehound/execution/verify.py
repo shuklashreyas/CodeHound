@@ -49,7 +49,7 @@ def comparison(baseline, candidate):
 
 
 async def verify_snapshot(
-    snapshot, suites, runner, *, workspace_factory=GitWorkspace, mode="pytest"
+    snapshot, suites, runner, *, workspace_factory=GitWorkspace, mode="pytest", on_progress=None
 ):
     if mode not in ("pytest", "independent"):
         raise ValueError("Unsupported evaluator mode.")
@@ -66,19 +66,29 @@ async def verify_snapshot(
         raise ValueError("Provide visible and/or independent hidden tests.")
 
     def identity(path):
+        if isinstance(path, TrustedSuite):
+            return path.sha256
         return TrustedSuite.load(path).sha256 if mode == "independent" else suite_digest(path)
 
     identities = {name: identity(path) for name, path in suites.items()}
     prepared = {
-        name: TrustedSuite.load(path) if mode == "independent" else path
+        name: (path if isinstance(path, TrustedSuite) else TrustedSuite.load(path))
+        if mode == "independent"
+        else path
         for name, path in suites.items()
     }
     results = {}
+    if on_progress:
+        await on_progress("checkout")
     async with workspace_factory(
         reference.repository, snapshot["base_sha"], snapshot["head_sha"]
     ) as checkouts:
         for name, tests in suites.items():
+            if on_progress:
+                await on_progress(f"{name}_baseline")
             baseline = await runner.run(checkouts.baseline, prepared[name])
+            if on_progress:
+                await on_progress(f"{name}_candidate")
             candidate = await runner.run(checkouts.candidate, prepared[name])
             if identity(tests) != identities[name]:
                 raise ValueError("Independent tests changed during execution; discard this run.")

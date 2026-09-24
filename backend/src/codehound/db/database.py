@@ -45,6 +45,9 @@ class Database:
         with self.engine.begin() as connection:
             if self.engine.dialect.name == "postgresql":
                 connection.execute(text("SELECT pg_advisory_xact_lock(704001725)"))
+            elif self.engine.dialect.name == "sqlite":
+                # API and worker can start together against the same local database.
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
 

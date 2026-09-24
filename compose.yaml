@@ -24,6 +24,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-codehound}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-codehound_local}
       POSTGRES_DB: ${POSTGRES_DB:-codehound}
+      CODEHOUND_EXECUTION_IMAGE_ID: ${CODEHOUND_EXECUTION_IMAGE_ID:-}
       CODEHOUND_FRONTEND_URL: ${CODEHOUND_FRONTEND_URL:-http://localhost:5173}
     depends_on:
       db:

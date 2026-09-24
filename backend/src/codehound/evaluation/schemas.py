@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from codehound.evaluation.job_schemas import ExecutionStatus, ExecutionSummary
 from codehound.repositories.urls import parse_pull_url
 
 
@@ -27,7 +28,7 @@ class VerificationCreate(BaseModel):
 
 class CheckResult(BaseModel):
     name: str
-    status: Literal["not_run", "needs_review", "unknown"]
+    status: Literal["not_run", "needs_review", "unknown", "pass", "fail", "inconclusive"]
     explanation: str
 
 
@@ -73,7 +74,8 @@ class VerificationReport(VerificationSummary):
     attempts: list[dict]
     checks: list[CheckResult]
     confidence: None = None
-    execution_status: Literal["not_run"] = "not_run"
+    execution_status: ExecutionStatus | Literal["not_run"] = "not_run"
+    latest_execution: ExecutionSummary | None = None
 
 
 class VerificationList(BaseModel):

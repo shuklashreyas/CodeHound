@@ -1,0 +1,116 @@
+{
+  "id": "codehound-url-contract",
+  "label": "CodeHound public PR URL contract",
+  "repository": "shuklashreyas/CodeHound",
+  "coverage": "Checks only public GitHub PR URL parsing and rejection of unsafe URL forms. Does not verify the comparison engine, frontend, or full task requirements. These bundled cases are public dogfooding fixtures, not secret benchmark tests.",
+  "visible": {
+    "schema_version": 1,
+    "module": "codehound.repositories.urls",
+    "function": "parse_pull_url",
+    "source_directory": "backend/src",
+    "result_encoding": "dataclass",
+    "timeout_seconds": 5,
+    "name": "url-visible",
+    "cases": [
+      {
+        "id": "public-url",
+        "args": [
+          "https://github.com/octocat/Hello-World/pull/7"
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "owner": "octocat",
+            "repo": "Hello-World",
+            "number": 7
+          }
+        }
+      },
+      {
+        "id": "trailing-slash",
+        "args": [
+          " https://github.com/octocat/project/pull/8/ "
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "owner": "octocat",
+            "repo": "project",
+            "number": 8
+          }
+        }
+      }
+    ]
+  },
+  "hidden": {
+    "schema_version": 1,
+    "module": "codehound.repositories.urls",
+    "function": "parse_pull_url",
+    "source_directory": "backend/src",
+    "result_encoding": "dataclass",
+    "timeout_seconds": 5,
+    "name": "url-independent",
+    "cases": [
+      {
+        "id": "wrong-host",
+        "args": [
+          "https://github.com.evil.test/o/r/pull/1"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      },
+      {
+        "id": "credentials",
+        "args": [
+          "https://user@github.com/o/r/pull/1"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      },
+      {
+        "id": "non-https",
+        "args": [
+          "http://github.com/o/r/pull/1"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      },
+      {
+        "id": "query",
+        "args": [
+          "https://github.com/o/r/pull/1?token=x"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      },
+      {
+        "id": "zero-number",
+        "args": [
+          "https://github.com/o/r/pull/0"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      },
+      {
+        "id": "parent-repo",
+        "args": [
+          "https://github.com/o/../pull/1"
+        ],
+        "expect": {
+          "kind": "exception",
+          "exception": "ValueError"
+        }
+      }
+    ]
+  }
+}
