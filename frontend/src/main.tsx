@@ -1,6 +1,5 @@
-import { StrictMode, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { GitHubAccount, GitHubRepositories, useGitHub, api } from "./github";
 
@@ -131,7 +130,7 @@ function savedRun(draft: SavedDraft): Run {
     persisted: true,
   };
 }
-function App() {
+export function App() {
   const auth = useGitHub();
   const [page, setPage] = useState(() => {
     const query = new URLSearchParams(window.location.search);
@@ -151,27 +150,60 @@ function App() {
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
+  const selectionVersion = useRef(0);
   useEffect(() => {
     const controller = new AbortController();
-    if (!auth.session?.user) {
-      setRuns((previous) => previous.filter((item) => !item.persisted));
-      setRun((previous) => (previous.persisted ? sample : previous));
-      return () => controller.abort();
-    }
-    api<{ items: SavedDraft[] }>("/verifications?limit=100", {
-      signal: controller.signal,
-    })
-      .then((data) => {
-        if (!controller.signal.aborted)
+    const version = selectionVersion.current;
+    setRuns((previous) => previous.filter((item) => !item.persisted));
+    setRun((previous) => (previous.persisted ? sample : previous));
+    if (!auth.session?.user) return () => controller.abort();
+    async function restore() {
+      try {
+        const data = await api<{ items: SavedDraft[] }>(
+          "/verifications?limit=100",
+          {
+            signal: controller.signal,
+          },
+        );
+        if (controller.signal.aborted) return;
+        const loaded = data.items.map(savedRun);
+        setRuns((previous) => [
+          ...loaded,
+          ...previous.filter((item) => !item.persisted),
+        ]);
+        const selected = new URLSearchParams(window.location.search).get(
+          "verification",
+        );
+        if (!selected || version !== selectionVersion.current) return;
+        let restored = loaded.find((item) => item.id === selected);
+        if (!restored) {
+          const detail = await api<SavedDraft>(
+            `/verifications/${encodeURIComponent(selected)}`,
+            { signal: controller.signal },
+          );
+          if (controller.signal.aborted || version !== selectionVersion.current)
+            return;
+          restored = savedRun(detail);
           setRuns((previous) => [
-            ...data.items.map(savedRun),
-            ...previous.filter((item) => !item.persisted),
+            restored!,
+            ...previous.filter((item) => item.id !== restored!.id),
           ]);
-      })
-      .catch((error) => {
+        }
+        if (
+          !controller.signal.aborted &&
+          version === selectionVersion.current
+        ) {
+          setRun(restored);
+          setPage("Verifications");
+        }
+      } catch (error) {
         if (!controller.signal.aborted)
-          setToast(`Could not load saved drafts: ${error.message}`);
-      });
+          setToast(
+            `Could not restore saved verification: ${(error as Error).message}`,
+          );
+      }
+    }
+    void restore();
     return () => controller.abort();
   }, [auth.session?.user?.login]);
   const currentChecks = checks.map((c) =>
@@ -185,6 +217,15 @@ function App() {
         },
   );
   function chooseRun(next: Run) {
+    selectionVersion.current++;
+    const location = new URL(window.location.href);
+    if (next.persisted) location.searchParams.set("verification", next.id);
+    else location.searchParams.delete("verification");
+    window.history.replaceState(
+      null,
+      "",
+      location.pathname + location.search + location.hash,
+    );
     setRun(next);
     setPage("Verifications");
     setTab("Overview");
@@ -1206,8 +1247,3 @@ function NewVerification({
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);

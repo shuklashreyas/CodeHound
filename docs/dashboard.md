@@ -22,6 +22,11 @@ again because sessions are in memory.
    **Export execution** includes that run's saved artifact; **Export report**
    includes the PR snapshot and the latest execution summary. Both are JSON.
 
+Selecting a saved report writes its ID to the page URL, so refreshing or bookmarking
+returns to that report after authentication. Access remains account-scoped; a link
+does not grant another account access. Older owned records can load directly even
+when they are outside the latest 100-item selector list.
+
 Execution history shows the latest 20 jobs. The verification checks section always
 reflects the latest execution, even when inspecting an older artifact. Full task
 completion and requirement adherence remain unverified; no numerical confidence
