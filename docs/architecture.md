@@ -23,7 +23,9 @@ claims jobs with expiring leases and keeps assertions outside candidate containe
 The frontend connects this flow and keeps its illustrative sample separate from real execution evidence. None of these components implements a
 calibrated ML judge, general static analyzer, or semantic requirement verifier yet.
 Changed Python test structure is inspected in an isolated parser; see
-[test-integrity.md](test-integrity.md).
+[test-integrity.md](test-integrity.md). Operator-defined requirements map to case
+outcomes, and Python source inspection supplies syntax/import-impact evidence.
+These mechanisms do not establish complete semantic issue coverage.
 
 ## Components
 
@@ -54,7 +56,8 @@ not mount the host Docker socket or pass host credentials into the container.
 Candidate pytest config and conftest files do not control test discovery. Both an
 in-container deadline and an outer watchdog bound runtime; output is capped and
 container removal is attempted in a final cleanup block. Host or daemon failure
-can interrupt cleanup; production workers also need orphan-container reconciliation.
+can interrupt cleanup; the worker reconciles aged resources by database namespace
+and execution claim after recovery. See [worker-recovery.md](worker-recovery.md).
 
 Python under test still shares a process with pytest. It can attempt to manipulate
 the test framework or terminate the process. Exit codes and logs are evidence, not
@@ -78,14 +81,16 @@ related tasks and patches together to avoid leakage. Measure false positives as
 well as detection among visible-test-passing patches. Retain human-reviewed labels,
 baseline failures, environment identities, and reproducible artifacts.
 
-The pagination fixture is public and synthetic. It demonstrates a correct fix
-versus an overfit one, not a benchmark result. Numerical confidence requires
-calibration against independently labeled data.
+The 12-patch corpus is public and synthetic. It demonstrates correct fixes,
+overfitting, regressions, and unchanged implementations across three task families.
+The [benchmark runner](benchmark.md) retains labels, abstentions, false positives,
+split-aware metrics, and immutable input identities. It does not establish real
+agent performance. Numerical confidence requires independent calibration data.
 
 ## Next milestones
 
-1. Build a reproducible labeled benchmark and compare visible-only detection.
-2. Add operator-owned profiles for more repository contracts.
-3. Broaden structural integrity coverage and add general static-analysis results.
-4. Harden worker storage quotas, account quotas, and orphan cleanup.
-5. Build a labeled benchmark before training learned evaluators.
+1. Gather human-reviewed real agent patches and held-out evaluation tasks.
+2. Add operator-owned profiles for more repository contracts and languages.
+3. Broaden structural integrity and static analysis beyond Python AST inspection.
+4. Harden worker storage quotas, account quotas, and deployment isolation.
+5. Compare stronger baselines and calibrate learned evaluators only with sufficient data.

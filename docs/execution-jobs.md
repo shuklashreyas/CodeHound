@@ -28,17 +28,27 @@ Docker socket. Do not run untrusted workloads on a shared production API host.
 
 ## Profiles
 
-The bundled `codehound-url-contract` profile covers **only** CodeHound's public PR
-URL parser. It is a public dogfooding fixture, not a secret benchmark or full
-coverage of a CodeHound PR. Other repositories have no profile until an operator
-provides one.
+The bundled profiles are public dogfooding fixtures, not secret benchmark tests or
+full coverage of a CodeHound PR:
+
+| Profile | Coverage | Visible / independent cases |
+| --- | --- | --- |
+| `codehound-url-contract` | Public PR URL parsing and unsafe URL rejection | 2 / 6 |
+| `codehound-verdict-contract` | Verdict aggregation, regression priority, uncertainty, and improvement signals | 3 / 9 |
+
+The verdict profile requires `codehound.execution.results.summarize_comparisons`
+in both revisions. For CodeHound PR #1, that module was newly added, so the baseline
+cannot satisfy the adapter contract and the comparison remains inconclusive. Use
+later PRs to check its existing behavior. Missing targets are never silently treated
+as passing checks. Other repositories have no profile until an operator provides one.
 
 Set `CODEHOUND_PROFILE_DIR` to replace the bundled profiles with JSON files you
 control. Each file contains `id`, `label`, `repository`, `coverage`, a `visible`
 trusted suite, and an optional `hidden` trusted suite. Suite format is documented
 in [independent-evaluator.md](independent-evaluator.md). The API freezes the full
 profile, image ID, and commit/diff identities when a job is queued. Profile bodies
-and expected answers are never returned by API serializers.
+and expected answers are never returned by API serializers. Optional requirement
+mappings are described in [requirement-evidence.md](requirement-evidence.md).
 
 ## API
 
@@ -73,13 +83,15 @@ has a 600-second total deadline in addition to suite and case limits.
 
 Verification detail/export now includes the latest execution summary. Configured
 visible/independent checks can have actual pass/fail/inconclusive outcomes. Task
-completion, semantic requirement adherence, and other unimplemented checks remain
-unrun, and the absence of detected regressions is not a global safety guarantee.
+completion and other unimplemented checks remain unrun. Operator requirement
+evidence and Python source inspection have their own limited coverage; neither
+establishes semantic issue completion. Absence of detected regressions is not a
+global safety guarantee.
 
 ## Operational limits
 
 Sessions remain process-local, so run one API worker. The queue can use multiple
 execution workers, each processing one job at a time. Dedicated disk quotas,
-request/account quotas, orphan-container/workspace reconciliation, and deployment
-hardening are still required before public production use. The local implementation
-does not silently claim these operational protections exist.
+request/account quotas, and deployment hardening are still required before public
+production use. Claim-aware [orphan recovery](worker-recovery.md) now handles aged
+resources owned by expired jobs; it is not a storage quota.
