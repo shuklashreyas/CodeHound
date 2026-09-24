@@ -57,3 +57,8 @@ pagination experiment in [independent-evaluator.md](independent-evaluator.md).
 - **Sign-in expired:** reconnect GitHub. Saved records survive sign-out.
 
 The sample report remains illustrative and never supplies evidence to a saved run.
+
+Temporary evidence-loading failures (network errors, rate limits, or server errors)
+retry up to four times with increasing delays. These are read-only requests;
+execution submissions are never automatically retried. Permanent errors keep the
+manual **Refresh evidence** action available.

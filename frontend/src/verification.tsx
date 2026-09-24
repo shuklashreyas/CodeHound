@@ -144,6 +144,8 @@ export function Verification({
   const [profileId, setProfileId] = useState("");
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const [busy, setBusy] = useState("");
   const pending = useRef(false);
   const submission = useRef<{ profile: string; key: string } | null>(null);
@@ -156,6 +158,7 @@ export function Verification({
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
+    let failures = 0;
     async function load() {
       try {
         const [next, profiles, history] = await Promise.all([
@@ -175,6 +178,9 @@ export function Verification({
             })
           : null;
         if (controller.signal.aborted) return;
+        failures = 0;
+        setLoadError("");
+        setRetryAttempt(0);
         setReport(next);
         setAvailability(profiles);
         setJobs(history);
@@ -188,7 +194,19 @@ export function Verification({
           timer = setTimeout(() => void load(), 2000);
       } catch (failure) {
         if (controller.signal.aborted) return;
-        setError((failure as Error).message);
+        setLoadError((failure as Error).message);
+        const temporary =
+          failure instanceof ApiError &&
+          (failure.status === 0 ||
+            failure.status === 429 ||
+            failure.status >= 500);
+        failures += 1;
+        if (temporary && failures <= 4) {
+          setRetryAttempt(failures);
+          timer = setTimeout(() => void load(), 2000 * 2 ** (failures - 1));
+        } else {
+          setRetryAttempt(0);
+        }
         if (failure instanceof ApiError && failure.status === 401)
           onUnauthorized();
       }
@@ -261,12 +279,17 @@ export function Verification({
   const running = jobs.find(active);
   return (
     <div className="live-verification">
-      {error && (
+      {(error || loadError) && (
         <div className="github-error" role="alert">
-          {error}
+          {error || loadError}
+          {loadError && retryAttempt > 0 && (
+            <span> Retrying evidence load ({retryAttempt}/4)…</span>
+          )}
           <button
             onClick={() => {
               setError("");
+              setLoadError("");
+              setRetryAttempt(0);
               setRevision((r) => r + 1);
             }}
           >
@@ -276,7 +299,11 @@ export function Verification({
       )}
       {!report ? (
         <section className="panel empty-state" role="status">
-          Loading saved verification…
+          {loadError
+            ? retryAttempt
+              ? "Waiting to retry evidence loading…"
+              : "Evidence unavailable. Refresh to try again."
+            : "Loading saved verification…"}
         </section>
       ) : (
         <>
