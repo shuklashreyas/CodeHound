@@ -61,4 +61,4 @@ jobs:
       - run: docker build -t codehound-python-test:ci backend/test-environments/python
       - name: Test isolated execution
         run: |
-          CODEHOUND_TEST_IMAGE_ID="$(docker image inspect --format '{{.Id}}' codehound-python-test:ci)" pytest backend/tests/test_docker_runner.py backend/tests/test_independent.py backend/tests/test_integrity.py
+          CODEHOUND_TEST_IMAGE_ID="$(docker image inspect --format '{{.Id}}' codehound-python-test:ci)" pytest backend/tests/test_docker_runner.py backend/tests/test_independent.py backend/tests/test_integrity.py backend/tests/test_benchmark.py

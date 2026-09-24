@@ -24,6 +24,8 @@ execution, hidden tests, patch integrity checks, and repository context.
   containers; supports operator-defined Python function profiles.
 - **Structural test review:** inspect removed tests, changed assertions and new skip
   markers in changed Python test files without importing candidate code.
+- **Benchmark runner:** a labeled 12-patch synthetic corpus, visible-only vs independent
+  decisions, false-positive counts, split-aware metrics, and atomic evidence checkpoints.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
   fix passes visible tests but fails independent cases.
 
@@ -232,4 +234,6 @@ well as frontend tests and the production build.
 
 See [architecture and remaining boundaries](docs/architecture.md) and the
 [dashboard walkthrough](docs/dashboard.md). Next: broaden independently retained
-test profiles and benchmark their ability to catch misleading patches.
+test profiles and gather human-reviewed real agent patches. The
+[benchmark runner](docs/benchmark.md) provides reproducible experiment plumbing; its
+public synthetic corpus does not establish real-world detection performance.

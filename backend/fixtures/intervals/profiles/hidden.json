@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "name": "interval-independent",
+  "module": "intervals",
+  "function": "merge_intervals",
+  "cases": [
+    {
+      "id": "unsorted-overlap",
+      "args": [
+        [
+          [
+            7,
+            9
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            4,
+            8
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            2,
+            9
+          ]
+        ]
+      }
+    },
+    {
+      "id": "nested",
+      "args": [
+        [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            10
+          ]
+        ]
+      }
+    },
+    {
+      "id": "abutting",
+      "args": [
+        [
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "args": [
+        []
+      ],
+      "expect": {
+        "kind": "value",
+        "value": []
+      }
+    },
+    {
+      "id": "reverse-endpoints",
+      "args": [
+        [
+          [
+            3,
+            2
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "exception",
+        "exception": "ValueError"
+      }
+    },
+    {
+      "id": "zero-width",
+      "args": [
+        [
+          [
+            2,
+            2
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "exception",
+        "exception": "ValueError"
+      }
+    },
+    {
+      "id": "negative-overlap",
+      "args": [
+        [
+          [
+            -3,
+            0
+          ],
+          [
+            -1,
+            2
+          ]
+        ]
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            -3,
+            2
+          ]
+        ]
+      }
+    }
+  ]
+}
