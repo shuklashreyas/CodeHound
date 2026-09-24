@@ -25,6 +25,15 @@ def profile(**changes):
 
 
 @pytest.fixture
+def workspace(tmp_path):
+    # pytest's temporary root is mode 0700 on Linux. Mount a dedicated readable
+    # child, matching real Git checkouts, without weakening the container UID.
+    directory = tmp_path / "workspace"
+    directory.mkdir(mode=0o755)
+    return directory
+
+
+@pytest.fixture
 def image():
     value = os.getenv("CODEHOUND_TEST_IMAGE_ID")
     if not value:
@@ -73,8 +82,8 @@ def test_external_fixture_comparison(image):
     asyncio.run(run())
 
 
-def test_candidate_cannot_access_expectations_or_change_host_assertions(image, tmp_path):
-    (tmp_path / "candidate.py").write_text("""from pathlib import Path
+def test_candidate_cannot_access_expectations_or_change_host_assertions(image, workspace):
+    (workspace / "candidate.py").write_text("""from pathlib import Path
 import pytest
 
 def answer(value):
@@ -94,7 +103,7 @@ def answer(value):
             }
         ]
     )
-    result = asyncio.run(IndependentRunner(image).run(tmp_path, suite))
+    result = asyncio.run(IndependentRunner(image).run(workspace, suite))
     assert result.test_report["tests"][0]["outcome"] == "failed", result
     assert result.case_evidence[0]["observation"]["call_response"] == {
         "kind": "returned",
@@ -103,19 +112,19 @@ def answer(value):
     assert "host-only-expectation-8237" not in str(result.to_dict())
 
 
-def test_zero_exit_and_missing_module_cannot_pass(image, tmp_path):
-    (tmp_path / "candidate.py").write_text("import os\ndef answer(value):\n    os._exit(0)\n")
-    result = asyncio.run(IndependentRunner(image).run(tmp_path, profile()))
+def test_zero_exit_and_missing_module_cannot_pass(image, workspace):
+    (workspace / "candidate.py").write_text("import os\ndef answer(value):\n    os._exit(0)\n")
+    result = asyncio.run(IndependentRunner(image).run(workspace, profile()))
     assert result.test_report["tests"][0]["outcome"] == "error"
     assert result.case_evidence[0]["observation"]["evidence_error"] == "missing_response"
     missing = asyncio.run(
-        IndependentRunner(image).run(tmp_path, profile(module="json", function="loads"))
+        IndependentRunner(image).run(workspace, profile(module="json", function="loads"))
     )
     assert missing.test_report["tests"][0]["outcome"] == "error"
 
 
-def test_timeout_and_no_state_shared_between_cases(image, tmp_path):
-    (tmp_path / "candidate.py").write_text("""import time
+def test_timeout_and_no_state_shared_between_cases(image, workspace):
+    (workspace / "candidate.py").write_text("""import time
 count = 0
 
 def answer(value):
@@ -133,7 +142,7 @@ def answer(value):
             {"id": "timeout", "args": [0], "expect": {"kind": "value", "value": 1}},
         ],
     )
-    result = asyncio.run(IndependentRunner(image).run(tmp_path, suite))
+    result = asyncio.run(IndependentRunner(image).run(workspace, suite))
     assert [case["outcome"] for case in result.test_report["tests"]] == [
         "passed",
         "passed",
@@ -142,8 +151,8 @@ def answer(value):
     assert result.case_evidence[-1]["observation"]["status"] == "timeout"
 
 
-def test_monorepo_dataclass_contract(image, tmp_path):
-    source = tmp_path / "backend" / "src"
+def test_monorepo_dataclass_contract(image, workspace):
+    source = workspace / "backend" / "src"
     source.mkdir(parents=True)
     (source / "candidate.py").write_text("""from dataclasses import dataclass
 @dataclass
@@ -160,7 +169,7 @@ def answer(value):
             {"id": "dataclass", "args": [5], "expect": {"kind": "value", "value": {"doubled": 10}}}
         ],
     )
-    result = asyncio.run(IndependentRunner(image).run(tmp_path, suite))
+    result = asyncio.run(IndependentRunner(image).run(workspace, suite))
     assert result.test_report["tests"][0]["outcome"] == "passed", result
     with pytest.raises(ValidationError):
         profile(source_directory="../outside")
