@@ -17,6 +17,7 @@ from codehound.evaluation.registry import EvaluationProfile
 from codehound.evaluation.requirements import requirement_evidence
 from codehound.execution.cleanup import reconcile
 from codehound.execution.docker import control
+from codehound.execution.impact import analyze_python_impact
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.integrity import analyze_test_integrity
 from codehound.execution.verify import verify_snapshot
@@ -64,6 +65,7 @@ async def execute_job(job, database, executor=verify_snapshot):
                 mode="independent",
                 on_progress=progress,
                 integrity_analyzer=analyze_test_integrity,
+                impact_analyzer=analyze_python_impact,
             )
     artifact["profile"] = profile.public()
     artifact["requirement_evidence"] = requirement_evidence(profile, artifact)

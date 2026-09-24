@@ -126,3 +126,27 @@ def execution_checks(checks, job):
             f"{len(requirements) - supported - contradicted} unverified. "
             "Coverage of the submitted issue has not been established."
         )
+
+    impact = job.artifact.get("python_impact")
+    if impact:
+        count = len(impact["new_syntax_errors"])
+        check = by_name["static_analysis"]
+        check.status = (
+            "fail" if count else "inconclusive" if impact["status"] == "inconclusive" else "unknown"
+        )
+        check.explanation = (
+            f"{count} new Python syntax errors observed. "
+            "Only syntax and static imports were inspected; "
+            "lint, types, and security remain unverified."
+        )
+        affected = {
+            item["path"]
+            for revision in impact["revisions"].values()
+            for item in revision["affected"]
+        }
+        check = by_name["downstream_impact"]
+        check.status = "needs_review" if affected else "unknown"
+        check.explanation = (
+            f"{len(affected)} displayed downstream Python files may depend on changed paths. "
+            "Import reachability is a review hint, not proof of a regression."
+        )
