@@ -92,6 +92,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 it("captures an immutable snapshot before enabling execution", async () => {
@@ -392,3 +393,59 @@ it("cancels the active execution and does not issue a passing verdict", async ()
   expect(screen.queryByText("Cancel execution")).toBeNull();
   expect(screen.queryByText("Improvement observed")).toBeNull();
 });
+
+it("recovers a transient evidence failure without resubmitting an execution", async () => {
+  vi.useFakeTimers();
+  let unavailable = true;
+  const fetch = vi.fn((path: string, options?: RequestInit) => {
+    expect(options?.method).not.toBe("POST");
+    if (path.endsWith("/profiles"))
+      return response(
+        unavailable
+          ? { detail: "Worker configuration is temporarily unavailable." }
+          : { configured: true, worker_online: true, profiles: [profile] },
+        unavailable ? 503 : 200,
+      );
+    if (path.endsWith("/executions")) return response([]);
+    return response({ ...draft, status: "ready", snapshot });
+  });
+  vi.stubGlobal("fetch", fetch);
+  await act(async () => {
+    render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+  });
+  expect(screen.getByText(/Retrying evidence load/)).toBeTruthy();
+  unavailable = false;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(screen.getByText("PR snapshot captured")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(
+    fetch.mock.calls.filter(([path]) => path.endsWith("/profiles")),
+  ).toHaveLength(2);
+});
+
+it.each([503, 404])(
+  "bounds automatic retries for status %s",
+  async (status) => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(() =>
+      response({ detail: "Evidence unavailable." }, status),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(status === 503 ? 15 : 3);
+    expect(screen.queryByText(/Retrying evidence load/)).toBeNull();
+    expect(
+      screen.getByText("Evidence unavailable. Refresh to try again."),
+    ).toBeTruthy();
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(status === 503 ? 15 : 3);
+  },
+);
