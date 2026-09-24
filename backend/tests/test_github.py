@@ -233,3 +233,59 @@ def test_malformed_repository_response_returns_gateway_error(monkeypatch):
     with TestClient(app) as http:
         signed_in(http)
         assert http.get("/api/github/repositories").status_code == 502
+
+
+def test_oauth_preserves_only_a_validated_verification_destination(monkeypatch):
+    identifier = "ed4b9ad8-4529-4bd7-83cc-5268fd6dfdb9"
+    real_client = httpx.AsyncClient
+
+    def handler(request):
+        if request.url.path == "/login/oauth/access_token":
+            return httpx.Response(200, json={"access_token": "private-token"})
+        return httpx.Response(200, json={"id": 1, "login": "octocat"})
+
+    monkeypatch.setattr(
+        github, "client", lambda token=None: real_client(transport=httpx.MockTransport(handler))
+    )
+    with TestClient(app) as http:
+        for value in (
+            "https://evil.example",
+            "//evil.example",
+            "../escape",
+            identifier + "?evil=true",
+        ):
+            assert (
+                http.get(
+                    "/api/auth/github/login", params={"verification": value}, follow_redirects=False
+                ).status_code
+                == 422
+            )
+        response = http.get(
+            "/api/auth/github/login", params={"verification": identifier}, follow_redirects=False
+        )
+        state = parse_qs(urlparse(response.headers["location"]).query)["state"][0]
+        assert "verification" not in parse_qs(urlparse(response.headers["location"]).query)
+        callback = http.get(
+            "/api/auth/github/callback",
+            params={"state": state, "code": "x", "verification": "https://evil.example"},
+            follow_redirects=False,
+        )
+        destination = urlparse(callback.headers["location"])
+        assert destination.netloc == "localhost:5173"
+        assert parse_qs(destination.query) == {
+            "github": ["connected"],
+            "verification": [identifier],
+        }
+        response = http.get(
+            "/api/auth/github/login", params={"verification": identifier}, follow_redirects=False
+        )
+        state = parse_qs(urlparse(response.headers["location"]).query)["state"][0]
+        denied = http.get(
+            "/api/auth/github/callback",
+            params={"state": state, "error": "access_denied"},
+            follow_redirects=False,
+        )
+        assert parse_qs(urlparse(denied.headers["location"]).query) == {
+            "auth_error": ["denied"],
+            "verification": [identifier],
+        }
