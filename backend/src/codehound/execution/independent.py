@@ -14,6 +14,7 @@ from pydantic import JsonValue, TypeAdapter
 
 from codehound.execution.docker import ContainerRunner, ExecutionResult
 from codehound.execution.profiles import TrustedSuite
+from codehound.execution.protocol import load_evidence
 
 CALL_PREFIX = "CODEHOUND_CALL_V1:"
 JSON_VALUE = TypeAdapter(JsonValue)
@@ -25,16 +26,25 @@ def decode_response(stdout, token):
     if len(frames) != 1:
         return None, "missing_response" if not frames else "duplicate_responses"
     try:
-        response = json.loads(base64.b64decode(frames[0], validate=True))
+        response = load_evidence(base64.b64decode(frames[0], validate=True), limit=16384)
+        if not isinstance(response, dict):
+            raise ValueError("Response must be an object")
         kind = response["kind"]
+        fields = {
+            "returned": {"kind", "value"},
+            "raised": {"kind", "exception"},
+            "adapter_error": {"kind", "message"},
+        }
+        if not isinstance(kind, str) or set(response) != fields.get(kind):
+            raise ValueError("Invalid response envelope")
         if kind == "returned":
             JSON_VALUE.validate_python(response["value"], strict=True)
             json.dumps(response["value"], allow_nan=False)
         elif kind == "raised":
             if not isinstance(response["exception"], str) or len(response["exception"]) > 200:
                 raise ValueError("Invalid exception")
-        elif kind != "adapter_error":
-            raise ValueError("Invalid response kind")
+        elif not isinstance(response["message"], str) or len(response["message"]) > 2000:
+            raise ValueError("Invalid adapter error")
     except (ValueError, TypeError, KeyError, RecursionError, binascii.Error):
         return None, "invalid_response"
     return response, None
@@ -127,6 +137,7 @@ class IndependentRunner(ContainerRunner):
         evaluator = hashlib.sha256(
             Path(__file__).read_bytes()
             + (Path(__file__).parent / "adapters" / "call_adapter.py").read_bytes()
+            + (Path(__file__).parent / "protocol.py").read_bytes()
             + profile.canonical_bytes()
         ).hexdigest()
         runner = IndependentRunner(

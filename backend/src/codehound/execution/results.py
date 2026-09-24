@@ -6,8 +6,9 @@ reports, but is not proof against a deliberately compromised Python interpreter.
 
 import base64
 import binascii
-import json
 from collections import Counter
+
+from codehound.execution.protocol import load_evidence
 
 PREFIX = "CODEHOUND_TEST_REPORT_V1:"
 MAX_TESTS = 10000
@@ -24,16 +25,22 @@ def decode_report(stdout: str, token: str, exit_code: int | None):
         raw = base64.b64decode(frames[0], validate=True)
         if len(raw) > MAX_REPORT_BYTES:
             return None, "report_too_large"
-        report = json.loads(raw)
+        report = load_evidence(raw, limit=MAX_REPORT_BYTES)
         validate_report(report, exit_code)
-    except (ValueError, TypeError, KeyError, binascii.Error):
+    except (ValueError, TypeError, KeyError, RecursionError, binascii.Error):
         return None, "invalid_report"
     return report, None
 
 
 def validate_report(report, exit_code):
-    if not isinstance(report, dict) or report.get("schema_version") != 1:
+    if (
+        not isinstance(report, dict)
+        or type(report.get("schema_version")) is not int
+        or report["schema_version"] != 1
+    ):
         raise ValueError("Unsupported report")
+    if set(report) != {"schema_version", "exit_code", "collected", "tests", "collection_errors"}:
+        raise ValueError("Unexpected report fields")
     if type(report.get("exit_code")) is not int or report["exit_code"] != exit_code:
         raise ValueError("Exit code differs")
     collected, tests = report.get("collected"), report.get("tests")
@@ -49,6 +56,8 @@ def validate_report(report, exit_code):
     for case in tests:
         if not isinstance(case, dict) or case.get("outcome") not in OUTCOMES:
             raise ValueError("Invalid outcome")
+        if set(case) != {"nodeid", "outcome", "duration_seconds", "message"}:
+            raise ValueError("Unexpected test fields")
         if not isinstance(case.get("nodeid"), str):
             raise ValueError("Invalid test identity")
         identities.append(case["nodeid"])
