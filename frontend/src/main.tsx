@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { GitHubAccount, GitHubRepositories, useGitHub, api } from "./github";
 
+import { Verification } from "./verification";
+
 import { checks, sample, tabs } from "./report-data";
 import type { Status, Run, Tab } from "./report-data";
 
@@ -393,11 +395,12 @@ function App() {
                     <>
                       <strong>
                         {run.persisted
-                          ? "Draft saved to your workspace."
+                          ? "Saved verification."
                           : "Draft created in this session."}
                       </strong>{" "}
-                      No code has been executed. All verification checks are not
-                      run.
+                      {run.persisted
+                        ? "Capture the PR and run independent checks below."
+                        : "Sign in and create a saved verification to run checks."}
                     </>
                   )}
                 </span>
@@ -427,481 +430,513 @@ function App() {
                 </select>
                 <span className="session-note">
                   {auth.session?.user
-                    ? "Latest 100 saved drafts"
+                    ? "Latest 100 saved verifications"
                     : "Drafts last for this session"}
                 </span>
               </div>
-              <section className="report-card">
-                <div className="report-heading">
-                  <div>
-                    <div className="repo-label">
-                      <Icon name="github" size={16} />
-                      {run.repo}
-                      <span className="pill">
-                        {run.sample ? "SAMPLE" : "DRAFT"}
+              {run.persisted && auth.session?.user ? (
+                <Verification
+                  key={`${auth.session.user.login}:${run.id}`}
+                  id={run.id}
+                  onUnauthorized={auth.refresh}
+                />
+              ) : (
+                <>
+                  <section className="report-card">
+                    <div className="report-heading">
+                      <div>
+                        <div className="repo-label">
+                          <Icon name="github" size={16} />
+                          {run.repo}
+                          <span className="pill">
+                            {run.sample ? "SAMPLE" : "DRAFT"}
+                          </span>
+                        </div>
+                        <h2>{run.title}</h2>
+                        <div className="report-meta">
+                          {run.sample ? (
+                            <>
+                              <span>
+                                <Icon name="branch" size={14} />
+                                fix/session-expiration
+                              </span>
+                              <i /> <span>8c4e2a1 → f7b93d2</span>
+                              <i />
+                              <span>
+                                <Icon name="clock" size={14} />
+                                1m 24s · sample
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{run.date}</span>
+                              <i />
+                              <a href={run.pr} target="_blank" rel="noreferrer">
+                                Open pull request ↗
+                              </a>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="button secondary"
+                        onClick={exportReport}
+                      >
+                        <Icon name="down" size={16} />
+                        Export report
+                      </button>
+                    </div>
+                    <div
+                      className={`verdict ${run.sample ? "" : "draft-verdict"}`}
+                    >
+                      <span className="verdict-icon">
+                        <Icon name={run.sample ? "info" : "clock"} size={22} />
+                      </span>
+                      <div>
+                        <strong>
+                          {run.sample
+                            ? "Changes need attention"
+                            : "Sign in to run verification"}
+                        </strong>
+                        <p>
+                          {run.sample
+                            ? "Visible tests pass, but independent checks reveal an incomplete fix."
+                            : "Your PR and task description are captured. No repository has been fetched or evaluated."}
+                        </p>
+                      </div>
+                      <span className="verdict-label">
+                        {run.sample ? "SAMPLE VERDICT" : "NOT RUN"}
                       </span>
                     </div>
-                    <h2>{run.title}</h2>
-                    <div className="report-meta">
-                      {run.sample ? (
-                        <>
-                          <span>
-                            <Icon name="branch" size={14} />
-                            fix/session-expiration
-                          </span>
-                          <i /> <span>8c4e2a1 → f7b93d2</span>
-                          <i />
-                          <span>
-                            <Icon name="clock" size={14} />
-                            1m 24s · sample
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span>{run.date}</span>
-                          <i />
-                          <a href={run.pr} target="_blank" rel="noreferrer">
-                            Open pull request ↗
-                          </a>
-                        </>
-                      )}
+                    <div className="stats">
+                      <div>
+                        <span>Checks passed</span>
+                        <strong>
+                          {
+                            currentChecks.filter((c) => c.status === "Pass")
+                              .length
+                          }
+                          <small> / 13</small>
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Needs attention</span>
+                        <strong className={run.sample ? "orange-text" : ""}>
+                          {run.sample
+                            ? currentChecks.filter(
+                                (c) =>
+                                  c.status === "Fail" || c.status === "Partial",
+                              ).length
+                            : "—"}
+                          <small>{run.sample ? " checks" : ""}</small>
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Files changed</span>
+                        <strong>
+                          {run.sample ? "2" : "—"}
+                          {run.sample && (
+                            <small className="diff-count">
+                              <b>+18</b> −6
+                            </small>
+                          )}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Confidence</span>
+                        <strong className="confidence">Not scored</strong>
+                        <small>Requires calibrated evidence</small>
+                      </div>
                     </div>
-                  </div>
-                  <button className="button secondary" onClick={exportReport}>
-                    <Icon name="down" size={16} />
-                    Export report
-                  </button>
-                </div>
-                <div className={`verdict ${run.sample ? "" : "draft-verdict"}`}>
-                  <span className="verdict-icon">
-                    <Icon name={run.sample ? "info" : "clock"} size={22} />
-                  </span>
-                  <div>
-                    <strong>
-                      {run.sample
-                        ? "Changes need attention"
-                        : "Ready for backend integration"}
-                    </strong>
-                    <p>
-                      {run.sample
-                        ? "Visible tests pass, but independent checks reveal an incomplete fix."
-                        : "Your PR and task description are captured. No repository has been fetched or evaluated."}
-                    </p>
-                  </div>
-                  <span className="verdict-label">
-                    {run.sample ? "SAMPLE VERDICT" : "NOT RUN"}
-                  </span>
-                </div>
-                <div className="stats">
-                  <div>
-                    <span>Checks passed</span>
-                    <strong>
-                      {currentChecks.filter((c) => c.status === "Pass").length}
-                      <small> / 13</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Needs attention</span>
-                    <strong className={run.sample ? "orange-text" : ""}>
-                      {run.sample
-                        ? currentChecks.filter(
-                            (c) =>
-                              c.status === "Fail" || c.status === "Partial",
-                          ).length
-                        : "—"}
-                      <small>{run.sample ? " checks" : ""}</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Files changed</span>
-                    <strong>
-                      {run.sample ? "2" : "—"}
-                      {run.sample && (
-                        <small className="diff-count">
-                          <b>+18</b> −6
-                        </small>
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Confidence</span>
-                    <strong className="confidence">Not scored</strong>
-                    <small>Requires calibrated evidence</small>
-                  </div>
-                </div>
-                <div
-                  className="tabs"
-                  role="tablist"
-                  aria-label="Report sections"
-                >
-                  {tabs.map((t) => (
-                    <button
-                      key={t}
-                      id={`tab-${t.replaceAll(" ", "-")}`}
-                      role="tab"
-                      tabIndex={tab === t ? 0 : -1}
-                      onKeyDown={(event) => {
-                        const direction =
-                          event.key === "ArrowRight"
-                            ? 1
-                            : event.key === "ArrowLeft"
-                              ? -1
-                              : 0;
-                        if (
-                          !direction &&
-                          event.key !== "Home" &&
-                          event.key !== "End"
-                        )
-                          return;
-                        event.preventDefault();
-                        const next =
-                          event.key === "Home"
-                            ? tabs[0]
-                            : event.key === "End"
-                              ? tabs[tabs.length - 1]
-                              : tabs[
-                                  (tabs.indexOf(t) + direction + tabs.length) %
-                                    tabs.length
-                                ];
-                        setTab(next);
-                        document
-                          .getElementById(`tab-${next.replaceAll(" ", "-")}`)
-                          ?.focus();
-                      }}
-                      aria-selected={tab === t}
-                      aria-controls="report-panel"
-                      className={tab === t ? "selected" : ""}
-                      onClick={() => setTab(t)}
+                    <div
+                      className="tabs"
+                      role="tablist"
+                      aria-label="Report sections"
                     >
-                      {t}
-                      {t === "Changed files" && run.sample && <span>2</span>}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <div
-                id="report-panel"
-                role="tabpanel"
-                aria-labelledby={`tab-${tab.replaceAll(" ", "-")}`}
-              >
-                {tab === "Overview" && (
-                  <div className="overview-grid">
-                    <section className="panel checks-panel">
-                      <div className="panel-heading">
-                        <h3>
-                          Verification checks <span>13</span>
-                        </h3>
-                        <select
-                          aria-label="Filter checks"
-                          value={filter}
-                          onChange={(e) => setFilter(e.target.value)}
+                      {tabs.map((t) => (
+                        <button
+                          key={t}
+                          id={`tab-${t.replaceAll(" ", "-")}`}
+                          role="tab"
+                          tabIndex={tab === t ? 0 : -1}
+                          onKeyDown={(event) => {
+                            const direction =
+                              event.key === "ArrowRight"
+                                ? 1
+                                : event.key === "ArrowLeft"
+                                  ? -1
+                                  : 0;
+                            if (
+                              !direction &&
+                              event.key !== "Home" &&
+                              event.key !== "End"
+                            )
+                              return;
+                            event.preventDefault();
+                            const next =
+                              event.key === "Home"
+                                ? tabs[0]
+                                : event.key === "End"
+                                  ? tabs[tabs.length - 1]
+                                  : tabs[
+                                      (tabs.indexOf(t) +
+                                        direction +
+                                        tabs.length) %
+                                        tabs.length
+                                    ];
+                            setTab(next);
+                            document
+                              .getElementById(
+                                `tab-${next.replaceAll(" ", "-")}`,
+                              )
+                              ?.focus();
+                          }}
+                          aria-selected={tab === t}
+                          aria-controls="report-panel"
+                          className={tab === t ? "selected" : ""}
+                          onClick={() => setTab(t)}
                         >
-                          {[
-                            "All checks",
-                            "Needs attention",
-                            "Passed",
-                            "Not run",
-                          ].map((f) => (
-                            <option key={f}>{f}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="table-heading">
-                        <span>CHECK</span>
-                        <span>RESULT</span>
-                      </div>
-                      {currentChecks
-                        .filter(
-                          (c) =>
-                            filter === "All checks" ||
-                            (filter === "Needs attention"
-                              ? ["Fail", "Partial"].includes(c.status)
-                              : c.status ===
-                                (filter === "Passed" ? "Pass" : "Not run")),
-                        )
-                        .map((c) => (
-                          <div className="check-item" key={c.name}>
-                            <button
-                              className="check-row"
-                              aria-expanded={expanded === c.name}
-                              onClick={() =>
-                                setExpanded(expanded === c.name ? null : c.name)
-                              }
+                          {t}
+                          {t === "Changed files" && run.sample && (
+                            <span>2</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                  <div
+                    id="report-panel"
+                    role="tabpanel"
+                    aria-labelledby={`tab-${tab.replaceAll(" ", "-")}`}
+                  >
+                    {tab === "Overview" && (
+                      <div className="overview-grid">
+                        <section className="panel checks-panel">
+                          <div className="panel-heading">
+                            <h3>
+                              Verification checks <span>13</span>
+                            </h3>
+                            <select
+                              aria-label="Filter checks"
+                              value={filter}
+                              onChange={(e) => setFilter(e.target.value)}
                             >
-                              <span className="check-number">
-                                {String(
-                                  checks.findIndex(
-                                    (check) => check.name === c.name,
-                                  ) + 1,
-                                ).padStart(2, "0")}
-                              </span>
-                              <span className="check-name">
-                                {c.name}
-                                <small>{c.description}</small>
-                              </span>
-                              <Badge status={c.status} />
-                              <span
-                                className={
-                                  expanded === c.name
-                                    ? "rotate chevron"
-                                    : "chevron"
-                                }
-                              >
-                                <Icon name="chevron" size={14} />
-                              </span>
-                            </button>
-                            {expanded === c.name && (
-                              <div className="check-detail">
-                                <strong>
-                                  {run.sample ? "Sample evidence" : "Evidence"}
-                                </strong>
-                                <p>{c.evidence}</p>
+                              {[
+                                "All checks",
+                                "Needs attention",
+                                "Passed",
+                                "Not run",
+                              ].map((f) => (
+                                <option key={f}>{f}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="table-heading">
+                            <span>CHECK</span>
+                            <span>RESULT</span>
+                          </div>
+                          {currentChecks
+                            .filter(
+                              (c) =>
+                                filter === "All checks" ||
+                                (filter === "Needs attention"
+                                  ? ["Fail", "Partial"].includes(c.status)
+                                  : c.status ===
+                                    (filter === "Passed" ? "Pass" : "Not run")),
+                            )
+                            .map((c) => (
+                              <div className="check-item" key={c.name}>
+                                <button
+                                  className="check-row"
+                                  aria-expanded={expanded === c.name}
+                                  onClick={() =>
+                                    setExpanded(
+                                      expanded === c.name ? null : c.name,
+                                    )
+                                  }
+                                >
+                                  <span className="check-number">
+                                    {String(
+                                      checks.findIndex(
+                                        (check) => check.name === c.name,
+                                      ) + 1,
+                                    ).padStart(2, "0")}
+                                  </span>
+                                  <span className="check-name">
+                                    {c.name}
+                                    <small>{c.description}</small>
+                                  </span>
+                                  <Badge status={c.status} />
+                                  <span
+                                    className={
+                                      expanded === c.name
+                                        ? "rotate chevron"
+                                        : "chevron"
+                                    }
+                                  >
+                                    <Icon name="chevron" size={14} />
+                                  </span>
+                                </button>
+                                {expanded === c.name && (
+                                  <div className="check-detail">
+                                    <strong>
+                                      {run.sample
+                                        ? "Sample evidence"
+                                        : "Evidence"}
+                                    </strong>
+                                    <p>{c.evidence}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          {currentChecks.filter(
+                            (c) =>
+                              filter === "All checks" ||
+                              (filter === "Needs attention"
+                                ? ["Fail", "Partial"].includes(c.status)
+                                : c.status ===
+                                  (filter === "Passed" ? "Pass" : "Not run")),
+                          ).length === 0 && (
+                            <div className="empty-state">
+                              No checks in this category.
+                            </div>
+                          )}
+                          <div className="panel-foot">
+                            <Icon name="info" size={14} />
+                            Select a check to inspect its supporting evidence.
+                          </div>
+                        </section>
+                        <div className="right-column">
+                          <section className="panel finding-panel">
+                            <div className="panel-heading">
+                              <h3>Key finding</h3>
+                              <span className="orange-dot" />
+                            </div>
+                            {run.sample ? (
+                              <>
+                                <span className="severity">
+                                  REGRESSION · SAMPLE
+                                </span>
+                                <h3>
+                                  The session expires.
+                                  <br />
+                                  The refresh token shouldn’t.
+                                </h3>
+                                <p>
+                                  The patch fixes expiration for normal
+                                  sessions, but refresh-token validation still
+                                  relies on the expired session.
+                                </p>
+                                <div className="file-reference">
+                                  <span>LIKELY AFFECTED</span>
+                                  <code>src/middleware/auth.ts</code>
+                                </div>
+                                <button
+                                  className="text-button"
+                                  onClick={() => setTab("Execution evidence")}
+                                >
+                                  Inspect execution evidence
+                                  <Icon name="arrow" size={15} />
+                                </button>
+                              </>
+                            ) : (
+                              <div className="empty-state">
+                                <Icon name="shield" size={28} />
+                                <h3>No findings yet</h3>
+                                <p>
+                                  Findings will appear after the verification
+                                  runner evaluates this change.
+                                </p>
                               </div>
                             )}
+                          </section>
+                          <section className="panel">
+                            <div className="panel-heading">
+                              <h3>Verification trail</h3>
+                            </div>
+                            <ol className="trail">
+                              {[
+                                "Repository & task",
+                                "Agent patch",
+                                "Independent checks",
+                                "Execution evidence",
+                                "Verification report",
+                              ].map((step, index) => (
+                                <li key={step}>
+                                  <span
+                                    className={
+                                      run.sample
+                                        ? "trail-dot done"
+                                        : "trail-dot"
+                                    }
+                                  >
+                                    {run.sample ? (
+                                      <Icon name="check" size={11} />
+                                    ) : (
+                                      index + 1
+                                    )}
+                                  </span>
+                                  <div>
+                                    {step}
+                                    <small>
+                                      {run.sample
+                                        ? [
+                                            "Sample issue & repository",
+                                            "2 files · 24 lines changed",
+                                            "13 dimensions reviewed",
+                                            "Tests, analysis & dependencies",
+                                            "Illustrative results",
+                                          ][index]
+                                        : [
+                                            "Draft inputs captured",
+                                            "Not fetched",
+                                            "Not run",
+                                            "Not available",
+                                            "Awaiting evaluation",
+                                          ][index]}
+                                    </small>
+                                  </div>
+                                </li>
+                              ))}
+                            </ol>
+                          </section>
+                          <div className="trust-note">
+                            <Icon name="shield" size={17} />
+                            <p>
+                              Evidence over assumptions.
+                              <br />
+                              <span>
+                                Unverified behavior is never marked as passed.
+                              </span>
+                            </p>
                           </div>
-                        ))}
-                      {currentChecks.filter(
-                        (c) =>
-                          filter === "All checks" ||
-                          (filter === "Needs attention"
-                            ? ["Fail", "Partial"].includes(c.status)
-                            : c.status ===
-                              (filter === "Passed" ? "Pass" : "Not run")),
-                      ).length === 0 && (
-                        <div className="empty-state">
-                          No checks in this category.
                         </div>
-                      )}
-                      <div className="panel-foot">
-                        <Icon name="info" size={14} />
-                        Select a check to inspect its supporting evidence.
                       </div>
-                    </section>
-                    <div className="right-column">
-                      <section className="panel finding-panel">
+                    )}
+                    {tab === "Changed files" && (
+                      <section className="panel">
                         <div className="panel-heading">
-                          <h3>Key finding</h3>
-                          <span className="orange-dot" />
+                          <h3>Patch scope</h3>
+                          <span className="muted">
+                            {run.sample
+                              ? "Illustrative diff summary"
+                              : "Awaiting repository intake"}
+                          </span>
                         </div>
                         {run.sample ? (
                           <>
-                            <span className="severity">
-                              REGRESSION · SAMPLE
-                            </span>
-                            <h3>
-                              The session expires.
-                              <br />
-                              The refresh token shouldn’t.
-                            </h3>
-                            <p>
-                              The patch fixes expiration for normal sessions,
-                              but refresh-token validation still relies on the
-                              expired session.
-                            </p>
-                            <div className="file-reference">
-                              <span>LIKELY AFFECTED</span>
-                              <code>src/middleware/auth.ts</code>
+                            {[
+                              ["src/services/session.ts", "+14", "−4"],
+                              ["src/utils/token.ts", "+4", "−2"],
+                            ].map(([file, add, remove]) => (
+                              <div className="file-row" key={file}>
+                                <Icon name="file" />
+                                <code>{file}</code>
+                                <span className="green-text">{add}</span>
+                                <span className="orange-text">{remove}</span>
+                              </div>
+                            ))}
+                            <div className="impact-box">
+                              <h3>Downstream dependency</h3>
+                              <div className="dependency">
+                                <code>session.ts</code>
+                                <Icon name="arrow" />
+                                <code>middleware/auth.ts</code>
+                                <Icon name="arrow" />
+                                <code>routes/refresh.ts</code>
+                              </div>
+                              <p>
+                                The unchanged authentication middleware depends
+                                on the modified session validation behavior.
+                                This sample identifies the refresh flow as
+                                affected.
+                              </p>
                             </div>
-                            <button
-                              className="text-button"
-                              onClick={() => setTab("Execution evidence")}
-                            >
-                              Inspect execution evidence
-                              <Icon name="arrow" size={15} />
-                            </button>
                           </>
                         ) : (
                           <div className="empty-state">
-                            <Icon name="shield" size={28} />
-                            <h3>No findings yet</h3>
-                            <p>
-                              Findings will appear after the verification runner
-                              evaluates this change.
-                            </p>
+                            Changed files will appear once CodeHound fetches the
+                            PR.
                           </div>
                         )}
                       </section>
+                    )}
+                    {tab === "Execution evidence" && (
                       <section className="panel">
                         <div className="panel-heading">
-                          <h3>Verification trail</h3>
-                        </div>
-                        <ol className="trail">
-                          {[
-                            "Repository & task",
-                            "Agent patch",
-                            "Independent checks",
-                            "Execution evidence",
-                            "Verification report",
-                          ].map((step, index) => (
-                            <li key={step}>
-                              <span
-                                className={
-                                  run.sample ? "trail-dot done" : "trail-dot"
-                                }
-                              >
-                                {run.sample ? (
-                                  <Icon name="check" size={11} />
-                                ) : (
-                                  index + 1
-                                )}
-                              </span>
-                              <div>
-                                {step}
-                                <small>
-                                  {run.sample
-                                    ? [
-                                        "Sample issue & repository",
-                                        "2 files · 24 lines changed",
-                                        "13 dimensions reviewed",
-                                        "Tests, analysis & dependencies",
-                                        "Illustrative results",
-                                      ][index]
-                                    : [
-                                        "Draft inputs captured",
-                                        "Not fetched",
-                                        "Not run",
-                                        "Not available",
-                                        "Awaiting evaluation",
-                                      ][index]}
-                                </small>
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      </section>
-                      <div className="trust-note">
-                        <Icon name="shield" size={17} />
-                        <p>
-                          Evidence over assumptions.
-                          <br />
-                          <span>
-                            Unverified behavior is never marked as passed.
+                          <h3>Execution evidence</h3>
+                          <span className="pill">
+                            {run.sample ? "SAMPLE OUTPUT" : "NOT RUN"}
                           </span>
-                        </p>
-                      </div>
-                    </div>
+                        </div>
+                        {run.sample ? (
+                          <>
+                            <div className="evidence-summary">
+                              <div>
+                                <span>Original visible suite</span>
+                                <strong>42 / 42 passed</strong>
+                              </div>
+                              <div>
+                                <span>Candidate visible suite</span>
+                                <strong>42 / 42 passed</strong>
+                              </div>
+                              <div>
+                                <span>Independent suite</span>
+                                <strong className="orange-text">
+                                  7 / 8 passed
+                                </strong>
+                              </div>
+                            </div>
+                            <div className="log-heading">
+                              <span className="orange-dot" />
+                              test_refresh_after_expiration
+                            </div>
+                            <pre className="log">{`ILLUSTRATIVE OUTPUT — not an actual execution\n\nBaseline    PASS  refresh token valid after session expiration\nCandidate   FAIL  refresh token valid after session expiration\n\n  POST /auth/refresh\n  session.expired = true\n  refreshToken.expired = false\n\n  Expected: 200 OK\n  Received: 401 Unauthorized\n\n  at tests/hidden/refresh.test.ts:38\n  via src/middleware/auth.ts:24\n\nStatic analysis: no new findings in sample comparison\nTest integrity: original test files unchanged`}</pre>
+                          </>
+                        ) : (
+                          <div className="empty-state">
+                            No commands have been executed. Logs and test
+                            results will appear here after a run.
+                          </div>
+                        )}
+                      </section>
+                    )}
+                    {tab === "Requirements" && (
+                      <section className="panel">
+                        <div className="panel-heading">
+                          <h3>Issue & acceptance criteria</h3>
+                        </div>
+                        <div className="issue-text">
+                          <span className="eyebrow">TASK DESCRIPTION</span>
+                          <p>{run.issue || "No task description supplied."}</p>
+                        </div>
+                        {run.sample ? (
+                          [
+                            [
+                              "Expired sessions are rejected on protected routes.",
+                              "Pass",
+                            ],
+                            [
+                              "Valid refresh tokens work after session expiration.",
+                              "Fail",
+                            ],
+                            ["Expired refresh tokens are rejected.", "Pass"],
+                          ].map(([text, status]) => (
+                            <div className="requirement" key={text}>
+                              <span>{text}</span>
+                              <Badge status={status as Status} />
+                            </div>
+                          ))
+                        ) : (
+                          <div className="empty-state">
+                            Acceptance criteria have not been analyzed.
+                          </div>
+                        )}
+                      </section>
+                    )}
                   </div>
-                )}
-                {tab === "Changed files" && (
-                  <section className="panel">
-                    <div className="panel-heading">
-                      <h3>Patch scope</h3>
-                      <span className="muted">
-                        {run.sample
-                          ? "Illustrative diff summary"
-                          : "Awaiting repository intake"}
-                      </span>
-                    </div>
-                    {run.sample ? (
-                      <>
-                        {[
-                          ["src/services/session.ts", "+14", "−4"],
-                          ["src/utils/token.ts", "+4", "−2"],
-                        ].map(([file, add, remove]) => (
-                          <div className="file-row" key={file}>
-                            <Icon name="file" />
-                            <code>{file}</code>
-                            <span className="green-text">{add}</span>
-                            <span className="orange-text">{remove}</span>
-                          </div>
-                        ))}
-                        <div className="impact-box">
-                          <h3>Downstream dependency</h3>
-                          <div className="dependency">
-                            <code>session.ts</code>
-                            <Icon name="arrow" />
-                            <code>middleware/auth.ts</code>
-                            <Icon name="arrow" />
-                            <code>routes/refresh.ts</code>
-                          </div>
-                          <p>
-                            The unchanged authentication middleware depends on
-                            the modified session validation behavior. This
-                            sample identifies the refresh flow as affected.
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="empty-state">
-                        Changed files will appear once CodeHound fetches the PR.
-                      </div>
-                    )}
-                  </section>
-                )}
-                {tab === "Execution evidence" && (
-                  <section className="panel">
-                    <div className="panel-heading">
-                      <h3>Execution evidence</h3>
-                      <span className="pill">
-                        {run.sample ? "SAMPLE OUTPUT" : "NOT RUN"}
-                      </span>
-                    </div>
-                    {run.sample ? (
-                      <>
-                        <div className="evidence-summary">
-                          <div>
-                            <span>Original visible suite</span>
-                            <strong>42 / 42 passed</strong>
-                          </div>
-                          <div>
-                            <span>Candidate visible suite</span>
-                            <strong>42 / 42 passed</strong>
-                          </div>
-                          <div>
-                            <span>Independent suite</span>
-                            <strong className="orange-text">
-                              7 / 8 passed
-                            </strong>
-                          </div>
-                        </div>
-                        <div className="log-heading">
-                          <span className="orange-dot" />
-                          test_refresh_after_expiration
-                        </div>
-                        <pre className="log">{`ILLUSTRATIVE OUTPUT — not an actual execution\n\nBaseline    PASS  refresh token valid after session expiration\nCandidate   FAIL  refresh token valid after session expiration\n\n  POST /auth/refresh\n  session.expired = true\n  refreshToken.expired = false\n\n  Expected: 200 OK\n  Received: 401 Unauthorized\n\n  at tests/hidden/refresh.test.ts:38\n  via src/middleware/auth.ts:24\n\nStatic analysis: no new findings in sample comparison\nTest integrity: original test files unchanged`}</pre>
-                      </>
-                    ) : (
-                      <div className="empty-state">
-                        No commands have been executed. Logs and test results
-                        will appear here after a run.
-                      </div>
-                    )}
-                  </section>
-                )}
-                {tab === "Requirements" && (
-                  <section className="panel">
-                    <div className="panel-heading">
-                      <h3>Issue & acceptance criteria</h3>
-                    </div>
-                    <div className="issue-text">
-                      <span className="eyebrow">TASK DESCRIPTION</span>
-                      <p>{run.issue || "No task description supplied."}</p>
-                    </div>
-                    {run.sample ? (
-                      [
-                        [
-                          "Expired sessions are rejected on protected routes.",
-                          "Pass",
-                        ],
-                        [
-                          "Valid refresh tokens work after session expiration.",
-                          "Fail",
-                        ],
-                        ["Expired refresh tokens are rejected.", "Pass"],
-                      ].map(([text, status]) => (
-                        <div className="requirement" key={text}>
-                          <span>{text}</span>
-                          <Badge status={status as Status} />
-                        </div>
-                      ))
-                    ) : (
-                      <div className="empty-state">
-                        Acceptance criteria have not been analyzed.
-                      </div>
-                    )}
-                  </section>
-                )}
-              </div>
+                </>
+              )}
             </>
           )}
           {page === "Repositories" && (
@@ -929,8 +964,8 @@ function App() {
                 <div className="notice inline-notice">
                   <Icon name="info" />
                   <span>
-                    Only public GitHub repositories are planned for V1. Draft
-                    URLs have not been checked for visibility or existence.
+                    Public GitHub repositories are supported. Capture a saved PR
+                    to validate its visibility and exact revisions.
                   </span>
                 </div>
                 {[
@@ -1080,7 +1115,7 @@ function App() {
             />
             <p className="form-hint">
               Include acceptance criteria and edge cases. The PR supplies the
-              repository and commit references once intake is connected.
+              repository and commit references when you capture the PR.
             </p>
             {error && (
               <p id="form-error" role="alert" className="form-error">

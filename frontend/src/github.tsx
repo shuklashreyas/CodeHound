@@ -11,7 +11,7 @@ type Repository = {
 };
 type Pull = { number: number; title: string; body: string; url: string };
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -20,8 +20,12 @@ class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const timeout = AbortSignal.timeout(20_000);
+export async function api<T>(
+  path: string,
+  options?: RequestInit,
+  timeoutMs = 20_000,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(timeoutMs);
   const signal = options?.signal
     ? AbortSignal.any([options.signal, timeout])
     : timeout;
