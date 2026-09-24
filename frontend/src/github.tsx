@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type User = { login: string; name: string };
 type Session = { configured: boolean; user: User | null };
@@ -11,17 +11,45 @@ type Repository = {
 };
 type Pull = { number: number; title: string; body: string; url: string };
 
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...options,
-    credentials: "same-origin",
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data)
-    throw new Error(
-      data?.detail ||
-        "Could not reach the CodeHound backend. Start the API and try again.",
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const timeout = AbortSignal.timeout(20_000);
+  const signal = options?.signal
+    ? AbortSignal.any([options.signal, timeout])
+    : timeout;
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...options,
+      credentials: "same-origin",
+      signal,
+    });
+  } catch (error) {
+    if (options?.signal?.aborted) throw error;
+    throw new ApiError(
+      timeout.aborted
+        ? "The request timed out. Please try again."
+        : "Could not reach CodeHound. Check that the backend is running and try again.",
+      0,
     );
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) {
+    throw new ApiError(
+      typeof data?.detail === "string"
+        ? data.detail
+        : "CodeHound returned an unexpected response. Please try again.",
+      response.status,
+    );
+  }
   return data as T;
 }
 
@@ -29,37 +57,56 @@ export function useGitHub() {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  async function refresh() {
+  const [signingOut, setSigningOut] = useState(false);
+  const requestVersion = useRef(0);
+  const refresh = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError("");
     try {
-      setSession(await api<Session>("/auth/session"));
+      const next = await api<Session>("/auth/session");
+      if (version === requestVersion.current) setSession(next);
     } catch (error) {
-      setSession(null);
-      setError((error as Error).message);
+      if (version === requestVersion.current) {
+        setSession(null);
+        setError((error as Error).message);
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }
+  }, []);
   useEffect(() => {
     void refresh();
-  }, []);
+    return () => {
+      requestVersion.current++;
+    };
+  }, [refresh]);
   async function logout() {
+    // Invalidate in-flight refreshes so they cannot restore a signed-out user.
+    const version = ++requestVersion.current;
     setLoading(true);
+    setSigningOut(true);
     setError("");
     try {
       await api("/auth/logout", {
         method: "POST",
         headers: { "X-CodeHound-Request": "1" },
       });
-      setSession((previous) => (previous ? { ...previous, user: null } : null));
+      if (version === requestVersion.current)
+        setSession((previous) =>
+          previous ? { ...previous, user: null } : null,
+        );
     } catch (error) {
-      setError((error as Error).message);
+      if (version === requestVersion.current)
+        setError((error as Error).message);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) {
+        setLoading(false);
+        setSigningOut(false);
+      }
     }
   }
-  return { session, error, loading, refresh, logout };
+  return { session, error, loading, signingOut, refresh, logout };
 }
 type Auth = ReturnType<typeof useGitHub>;
 
@@ -72,6 +119,15 @@ export function GitHubAccount({
 }) {
   return (
     <div className="github-account">
+      {auth.error && (
+        <button
+          className="account-error"
+          onClick={onConnect}
+          title={auth.error}
+        >
+          Connection issue · details
+        </button>
+      )}
       {auth.session?.user ? (
         <>
           <span>@{auth.session.user.login}</span>
@@ -80,7 +136,7 @@ export function GitHubAccount({
             disabled={auth.loading}
             onClick={() => void auth.logout()}
           >
-            {auth.loading ? "Signing out…" : "Sign out"}
+            {auth.signingOut ? "Signing out…" : "Sign out"}
           </button>
         </>
       ) : (
@@ -164,13 +220,17 @@ export function GitHubRepositories({
         setHasMore(data.has_more);
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setError(error.message);
+        if (!controller.signal.aborted) {
+          setError(error.message);
+          if (error instanceof ApiError && error.status === 401)
+            void auth.refresh();
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [auth.session?.user?.login, selected, page, retry]);
+  }, [auth.session?.user?.login, selected, page, retry, auth.refresh]);
   function pickRepo(repo: Repository | null) {
     setSelected(repo);
     setPage(1);

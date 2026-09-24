@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { GitHubAccount, GitHubRepositories, useGitHub } from "./github";
+import { GitHubAccount, GitHubRepositories, useGitHub, api } from "./github";
 
 import { checks, sample, tabs } from "./report-data";
 import type { Status, Run, Tab } from "./report-data";
@@ -109,6 +109,26 @@ function Logo() {
     </div>
   );
 }
+type SavedDraft = {
+  id: string;
+  repository: string;
+  pr_url: string;
+  issue_text: string;
+  title: string;
+  created_at: string;
+};
+function savedRun(draft: SavedDraft): Run {
+  return {
+    id: draft.id,
+    repo: draft.repository.replace("/", " / "),
+    pr: draft.pr_url,
+    issue: draft.issue_text,
+    title: draft.title,
+    date: new Date(draft.created_at).toLocaleString(),
+    sample: false,
+    persisted: true,
+  };
+}
 function App() {
   const auth = useGitHub();
   const [page, setPage] = useState(() => {
@@ -128,6 +148,30 @@ function App() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!auth.session?.user) {
+      setRuns((previous) => previous.filter((item) => !item.persisted));
+      setRun((previous) => (previous.persisted ? sample : previous));
+      return () => controller.abort();
+    }
+    api<{ items: SavedDraft[] }>("/verifications?limit=100", {
+      signal: controller.signal,
+    })
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setRuns((previous) => [
+            ...data.items.map(savedRun),
+            ...previous.filter((item) => !item.persisted),
+          ]);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setToast(`Could not load saved drafts: ${error.message}`);
+      });
+    return () => controller.abort();
+  }, [auth.session?.user?.login]);
   const currentChecks = checks.map((c) =>
     run.sample
       ? c
@@ -135,7 +179,7 @@ function App() {
           ...c,
           status: "Not run" as Status,
           evidence:
-            "No execution evidence is available. This submission is a local draft; the verification runner is not connected.",
+            "No execution evidence is available. The verification runner has not evaluated this submission.",
         },
   );
   function chooseRun(next: Run) {
@@ -145,7 +189,7 @@ function App() {
     setFilter("All checks");
     setExpanded(null);
   }
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     let parsed: URL;
     try {
@@ -174,7 +218,7 @@ function App() {
       );
       return;
     }
-    const next: Run = {
+    let next: Run = {
       id: crypto.randomUUID(),
       repo: `${match[1]} / ${match[2]}`,
       pr: `https://github.com/${match[1]}/${match[2]}/pull/${match[3]}`,
@@ -183,7 +227,31 @@ function App() {
       date: new Date().toLocaleString(),
       sample: false,
     };
-    setRuns((previous) => [next, ...previous]);
+    if (saving) return;
+    if (auth.session?.user) {
+      setSaving(true);
+      try {
+        next = savedRun(
+          await api<SavedDraft>("/verifications", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CodeHound-Request": "1",
+            },
+            body: JSON.stringify({ pr_url: next.pr, issue_text: next.issue }),
+          }),
+        );
+      } catch (error) {
+        setError((error as Error).message);
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
+    setRuns((previous) => [
+      next,
+      ...previous.filter((item) => item.id !== next.id),
+    ]);
     chooseRun(next);
     setModal(false);
     setUrl("");
@@ -323,9 +391,13 @@ function App() {
                     </>
                   ) : (
                     <>
-                      <strong>Draft created in this session.</strong> GitHub
-                      intake and the verification runner are not connected. All
-                      checks are not run.
+                      <strong>
+                        {run.persisted
+                          ? "Draft saved to your workspace."
+                          : "Draft created in this session."}
+                      </strong>{" "}
+                      No code has been executed. All verification checks are not
+                      run.
                     </>
                   )}
                 </span>
@@ -354,7 +426,9 @@ function App() {
                   ))}
                 </select>
                 <span className="session-note">
-                  Drafts last for this session
+                  {auth.session?.user
+                    ? "Latest 100 saved drafts"
+                    : "Drafts last for this session"}
                 </span>
               </div>
               <section className="report-card">
@@ -545,7 +619,7 @@ function App() {
                               : c.status ===
                                 (filter === "Passed" ? "Pass" : "Not run")),
                         )
-                        .map((c, index) => (
+                        .map((c) => (
                           <div className="check-item" key={c.name}>
                             <button
                               className="check-row"
@@ -555,7 +629,11 @@ function App() {
                               }
                             >
                               <span className="check-number">
-                                {String(index + 1).padStart(2, "0")}
+                                {String(
+                                  checks.findIndex(
+                                    (check) => check.name === c.name,
+                                  ) + 1,
+                                ).padStart(2, "0")}
                               </span>
                               <span className="check-name">
                                 {c.name}
@@ -946,7 +1024,11 @@ function App() {
         </div>
       )}
       {modal && (
-        <NewVerification onClose={() => setModal(false)}>
+        <NewVerification
+          onClose={() => {
+            if (!saving) setModal(false);
+          }}
+        >
           <form onSubmit={submit}>
             <div className="modal-heading">
               <span className="modal-icon">
@@ -954,6 +1036,7 @@ function App() {
               </span>
               <button
                 type="button"
+                disabled={saving}
                 className="icon-button"
                 aria-label="Close dialog"
                 onClick={() => setModal(false)}
@@ -989,6 +1072,7 @@ function App() {
               id="issue"
               required
               minLength={10}
+              maxLength={20000}
               rows={4}
               placeholder="Describe the expected behavior or paste the issue details…"
               value={issue}
@@ -1006,21 +1090,26 @@ function App() {
             <div className="draft-note">
               <Icon name="info" size={17} />
               <span>
-                This creates a session-only draft. Fetching, test execution, and
-                hidden-test configuration will be available when the backend is
-                connected.
+                {auth.session?.user
+                  ? "This draft is saved to your account and survives page refreshes. Verification is not run automatically."
+                  : "Sign in to save drafts to your account. Without sign-in, this draft lasts only for this session."}
               </span>
             </div>
             <div className="modal-actions">
               <button
                 className="button secondary"
                 type="button"
+                disabled={saving}
                 onClick={() => setModal(false)}
               >
                 Cancel
               </button>
-              <button className="button primary" type="submit">
-                Create draft
+              <button
+                className="button primary"
+                type="submit"
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Create draft"}
                 <Icon name="arrow" size={17} />
               </button>
             </div>

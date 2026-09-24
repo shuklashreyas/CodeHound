@@ -4,54 +4,67 @@
 
 Can an automated verification system detect incorrect AI-generated patches that
 still pass their visible tests? CodeHound investigates this through independent
-test execution, hidden tests, patch integrity checks, static analysis, and
-repository impact analysis, producing evidence-backed verification reports.
+execution, hidden tests, patch integrity checks, and repository context.
 
-## Current status
+## What works today
 
-This repository is an initial infrastructure scaffold:
+- **GitHub sign-in:** browse public repositories and select an open PR.
+- **Dashboard:** all 13 planned verification dimensions, clearly labeled sample
+  evidence, filters, changed files, requirements, and report export.
+- **Saved drafts:** signed-in submissions are stored by GitHub account and restored
+  on refresh. Signed-out drafts remain session-only. The UI loads the latest 100.
+- **PR intake API:** capture immutable commit references, a diff and its SHA-256,
+  file inventory, PR description, and integrity review hints.
+- **Persistence:** PostgreSQL in Docker Compose; SQLite locally without Docker.
+  Versioned Alembic migrations run at API startup.
+- **Restricted Python execution:** a standalone Docker runner with CPU, memory,
+  process, time, and output limits, plus independent read-only tests.
+- **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
+  fix passes visible tests but fails independent cases.
 
-- FastAPI backend with a typed liveness endpoint and an API smoke test.
-- React + TypeScript verification dashboard using the CodeHound logo.
-- Docker Compose services for the API and a persistent PostgreSQL database.
-- Python linting, frontend type checking, and GitHub Actions CI.
-- Separate packages for future repository analysis and evaluation orchestration.
-
-Patch submission, sandboxed evaluation, database models, hidden tests, and ML
-are not implemented yet. API health checks process liveness only.
+The web dashboard does **not** launch repository code. Snapshot intake is available
+through the API. A standalone comparison command connects pinned checkouts to
+independent tests; queued web execution and execution persistence are still future work.
+A `ready` intake record means evidence was captured, not that the patch is correct.
+Unexecuted checks remain `not_run`, and confidence is unscored.
 
 ## Project structure
 
 ```text
 backend/
   src/codehound/
-    api/             HTTP routes
-    core/            Shared configuration and domain types (planned)
-    evaluation/      Verification orchestration (planned)
-    repositories/    Repository and patch operations (planned)
-    main.py          FastAPI application
-  tests/             Backend tests
-  Dockerfile
-  pyproject.toml
+    api/             Authentication, repositories, verifications, health
+    core/            Request limits
+    db/              Models, transactions, and schema migrations
+    repositories/    URL validation, bounded GitHub intake, disposable Git checkouts
+    evaluation/      Submission and report contracts
+    execution/       Restricted Docker runner, revision comparison, fixture demo
+  tests/             Unit and integration tests
+  fixtures/          Original, correct, and overfit pagination examples
+  test-environments/ Trusted execution image definitions
 frontend/
-  src/               React application and styles
-  package.json
-data/                Local artifacts (contents ignored by Git)
-docs/
-  architecture.md    System boundaries and implementation milestones
-compose.yaml         Local API and PostgreSQL services
+  src/               React dashboard and GitHub connection views
+  public/            CodeHound logo
+data/                Ignored local database and execution evidence
+docs/                Architecture and API notes
+compose.yaml         Local PostgreSQL and API services
 ```
 
-## Quick start
+## Run locally
 
-Requirements: Docker with Compose, Node.js 22.12+ (Node 24 recommended), and
-Python 3.11+ if running the backend outside Docker.
+Requirements: Node.js 22.12+ (Node 24 recommended), Python 3.11+, and Git.
+Docker is needed for Compose and candidate-code execution, but not for local API
+metadata intake or SQLite persistence.
 
 From the repository root:
 
 ```sh
-cp .env.example .env
-docker compose up --build -d
+cp .env.example .env  # First setup only; preserve existing credentials.
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 In another terminal:
@@ -62,129 +75,143 @@ npm ci
 npm run dev
 ```
 
-Open [the frontend](http://localhost:5173), [API documentation](http://localhost:8000/docs),
-or [API health](http://localhost:8000/api/health).
-Vite forwards `/api` requests to the backend during development.
+Open [CodeHound](http://localhost:5173), [API documentation](http://localhost:8000/docs),
+[process health](http://localhost:8000/api/health), or
+[database readiness](http://localhost:8000/api/health/ready).
+Vite forwards `/api` to the backend. Use `localhost` consistently for OAuth cookies.
+Access logging is disabled in the example to avoid recording OAuth callback codes.
 
-PostgreSQL is available on `127.0.0.1:5432`; local credentials are configured in
-`.env`. These defaults are for development. The API does not connect to the database
-yet. Database data persists in the `postgres_data` Docker volume.
+Without database settings, local source checkouts use `data/codehound.db`. Set
+`CODEHOUND_DATABASE_URL` to a SQLAlchemy `postgresql+psycopg://...` URL to use PostgreSQL
+outside Docker. URL-encode special characters in credentials when constructing a URL.
+The database contains issue text and evidence; keep `data/` out of Git.
 
-Stop services with `docker compose down`. Adding `--volumes` also deletes local
-database data. The frontend runs separately and stops with Ctrl+C.
+### Docker Compose
 
-## Backend without Docker
+```sh
+docker compose up --build -d
+```
+
+Compose provisions PostgreSQL, waits for database health, then starts the API and
+applies migrations. Its separate credential settings support passwords containing
+URL punctuation. Run the frontend separately using the commands above.
+
+`docker compose down` stops services and keeps database data. Adding `--volumes`
+also deletes the local database. Containers bind their exposed ports to localhost.
+The API container is **not** the environment used to execute candidate patches.
+
+## GitHub sign-in setup
+
+1. Register an **OAuth app** in [GitHub Developer settings](https://github.com/settings/developers).
+2. Set the homepage to `http://localhost:5173`.
+3. Set the callback to `http://localhost:5173/api/auth/github/callback`.
+4. Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in your local `.env`.
+   Never place the secret in a `VITE_` variable or commit it.
+5. Restart the backend, then select **Sign in with GitHub**.
+
+If you change the origin, update `CODEHOUND_FRONTEND_URL` and the OAuth callback
+together. No additional OAuth scopes are requested: this version reads public
+profile/repository information and excludes private repositories.
+
+State and PKCE protect sign-in. Access tokens stay on the server; the browser gets
+an opaque HttpOnly cookie. HTTPS origins use Secure cookies. Sign-out removes the
+local session; revoke the underlying grant in [GitHub Applications](https://github.com/settings/applications).
+
+**Sessions are currently process-local:** restarting the API signs users out, but
+saved verification records remain. Run one API worker. A deployment needs a shared,
+expiring credential/session store, HTTPS, and request rate limits. Accounts are
+identified by immutable GitHub user IDs rather than changeable login names.
+
+## Capture PR evidence
+
+Signed-in users can create drafts in the UI. The API provides:
+
+| Endpoint | Behavior |
+| --- | --- |
+| `POST /api/verifications` | Save `pr_url` and `issue_text`; optional UUID `Idempotency-Key` |
+| `GET /api/verifications?limit=30&offset=0` | List the current account's records |
+| `GET /api/verifications/{id}` | Read a record and its evidence |
+| `POST /api/verifications/{id}/intake` | Capture an open public PR; retry a failed attempt |
+| `GET /api/verifications/{id}/export` | Download the evidence report as JSON |
+
+Writes require the session cookie and `X-CodeHound-Request: 1` from the configured
+frontend origin. Other accounts receive 404 for records they do not own. Reusing
+an idempotency key with different inputs returns 409. Captured snapshots are
+immutable: submit a new draft to inspect an updated PR.
+
+For an anonymous, read-only CLI capture without signing in:
 
 ```sh
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[dev]'
-uvicorn codehound.main:app --app-dir src --reload --host 127.0.0.1 --port 8000
+PYTHONPATH=src .venv/bin/python -m codehound.repositories.capture \
+  https://github.com/OWNER/REPO/pull/NUMBER --output ../data/pr-evidence.json
 ```
 
-The current health endpoint does not require PostgreSQL. To start only the database,
-run `docker compose up -d db` from the repository root.
+The CLI refuses to overwrite an existing output file. See [API and evidence details](docs/api.md)
+for limits, retry behavior, and the distinction between observations and verdicts.
+
+## Run the independent-test demonstration
+
+Build a trusted test image, then resolve its immutable local ID:
+
+```sh
+docker build -t codehound-python-test:dev backend/test-environments/python
+CODEHOUND_IMAGE_ID="$(docker image inspect --format '{{.Id}}' codehound-python-test:dev)"
+PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.demo \
+  --image "$CODEHOUND_IMAGE_ID" --output data/pagination-evidence.json
+```
+
+The report records stdout, stderr, exit codes, duration, image identity, and limits
+for the original code and both candidate fixes. The deliberately overfit patch
+passes the issue's example but fails varied cases. This is a public synthetic
+fixture, **not** a hidden benchmark or a detection-rate claim.
+
+The runner requires a trusted local image ID, disables networking, runs as a
+non-root user, and mounts candidate code, tests, and the harness read-only. Trusted
+pytest configuration takes precedence over candidate configuration. Exit codes
+remain execution evidence: arbitrary malicious Python can interfere with tests
+inside the same process. Strong adversarial isolation requires an external test
+protocol and further hardening before production use.
+
+## Compare a captured PR in Docker
+
+Supply tests you control independently of the candidate patch. The command checks
+out both pinned revisions, runs the same suites against each, and records the
+results and test-suite hashes. It accepts flat Python modules and `src/` layouts.
+Required third-party dependencies must already be installed in your trusted image;
+CodeHound does not run repository setup scripts or install its dependencies.
+
+```sh
+PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.verify \
+  --snapshot data/pr-evidence.json \
+  --visible-tests /absolute/path/to/trusted-visible-tests \
+  --hidden-tests /absolute/path/to/independent-tests \
+  --image-id "$CODEHOUND_IMAGE_ID" \
+  --output data/comparison-evidence.json
+```
+
+`--hidden-tests` is optional. The command refuses to overwrite evidence files.
+Comparisons are `both_pass`, `candidate_improves`, `both_fail`, or
+`regression_detected`. Timeouts, infrastructure errors, collection errors, and no
+collected tests are `inconclusive`. A test improvement is not a correctness verdict.
+This command is operator-controlled and is not exposed through the web API.
 
 ## Development checks
 
-From `backend/`, with its virtual environment activated:
-
 ```sh
-ruff check .
-ruff format --check .
-pytest
+backend/.venv/bin/ruff check backend
+backend/.venv/bin/ruff format --check backend
+backend/.venv/bin/python -m pytest backend/tests
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
 
-From `frontend/`:
+The default tests isolate storage in temporary SQLite databases. Set
+`CODEHOUND_TEST_POSTGRES_URL` to a **dedicated test database** to enable PostgreSQL
+integration checks. Set `CODEHOUND_TEST_IMAGE_ID` to the trusted Docker image ID to
+enable actual container tests. CI runs PostgreSQL and Docker integration jobs as
+well as frontend tests and the production build.
 
-```sh
-npm ci
-npm run build
-```
-
-GitHub Actions runs these checks on pushes and pull requests. Frontend dependencies
-are locked in `package-lock.json`; Python dependencies currently use bounded version
-ranges. A deployed frontend will need a same-origin `/api` reverse proxy;
-production hosting is not configured by this scaffold.
-
-## Next steps
-
-Start with one reproducible evaluation: repository + original commit + patch →
-isolated execution → baseline comparison → saved evidence → verification report.
-Then add hidden tests, integrity checks, static analysis, and benchmark baselines.
-
-See [the architecture notes](docs/architecture.md) for isolation requirements and
-the research evaluation plan. The development API container is not a sandbox
-for executing untrusted candidate patches.
-
-## Frontend preview
-
-The dashboard opens with a clearly labeled illustrative report. It includes all
-13 planned check dimensions, expandable evidence, status filters, changed-file
-and dependency summaries, execution logs, acceptance criteria, and JSON export.
-The repository view supports searching the current session's repositories; Check
-coverage explains the planned evaluator dimensions.
-
-Use **New verification** to enter a public GitHub PR URL and task description.
-The form validates the URL format and creates an in-memory draft with every check
-marked **Not run**. Drafts disappear on refresh. Manual draft submission does not fetch code, execute tests, upload tests, or
-persist evaluation records. GitHub sign-in can fetch repository and PR metadata
-as described below.
-Sample exports are explicitly marked `illustrative_sample`; draft exports are
-marked `not_run`. Confidence is intentionally unscored.
-
-The interface supports narrow screens and keyboard interaction. The supplied logo
-is stored in `frontend/public/codehound-logo.png`. Fonts load from Google Fonts,
-with local sans-serif fallbacks when offline.
-
-## GitHub sign-in and repository access
-
-CodeHound now implements GitHub OAuth sign-in, public repository browsing, and
-open-PR selection. The **Sign in with GitHub** button opens the repository screen.
-Once connected, select a repository, choose a PR, and review its description in
-the verification draft form. Repository and PR lists are paginated; filtering
-applies to the current page. This integration reads metadata; it does not clone
-repositories or run verification yet.
-
-### Configure a local GitHub OAuth app
-
-1. In [GitHub Developer settings](https://github.com/settings/developers), register
-   a **new OAuth app**.
-2. Set the homepage URL to `http://localhost:5173`.
-3. Set the authorization callback URL to
-   `http://localhost:5173/api/auth/github/callback`.
-4. Copy `.env.example` to `.env` if you have not already created it. Set
-   `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in that local file. Keep the secret
-   out of Git and never use a `VITE_` environment variable for it.
-5. Restart the API so it reads the settings. With Docker, run
-   `docker compose up --build -d api`. Without Docker, run from `backend/`:
-
-   ```sh
-   source .venv/bin/activate
-   python -m pip install -e '.[dev]'
-   uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000
-   ```
-
-Use `http://localhost:5173` consistently in your browser. If you change the origin,
-update `CODEHOUND_FRONTEND_URL` and the OAuth app callback together. Vite proxies
-the `/api` callback and API requests to FastAPI.
-
-The integration requests no additional OAuth scopes: it reads public profile and
-repository information. Private repositories remain excluded. Private repository
-support should use a GitHub App with explicit repository selection and read-only
-permissions instead of requesting the OAuth `repo` scope, which also grants write
-access. See [GitHub's OAuth scope documentation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps).
-
-Authentication uses one-time OAuth state, browser-bound state cookies, PKCE, and
-opaque HttpOnly session cookies. Access tokens are kept only on the backend and
-are never returned to the frontend. HTTPS origins use Secure cookies. Sign-out
-removes the local session; to revoke the GitHub authorization itself, use your
-[GitHub authorized applications](https://github.com/settings/applications).
-
-**Development limitation:** sessions and pending OAuth flows are stored in memory
-in one API process, expire automatically, and disappear on restart. Use one API
-worker for this scaffold. Before deployment, add a shared expiring session store,
-encryption for persisted credentials, HTTPS, and appropriate request rate limits.
-GitHub authorization cannot be exercised live until you configure your own app;
-backend tests cover the flow using mocked GitHub responses.
+See [architecture and remaining boundaries](docs/architecture.md). Next: connect
+pinned checkout, trusted test environments, execution persistence, and the UI into
+a queued evaluation pipeline.

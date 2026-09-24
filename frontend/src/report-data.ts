@@ -13,6 +13,7 @@ export type Run = {
   title: string;
   date: string;
   sample: boolean;
+  persisted?: boolean;
 };
 export type Tab =
   "Overview" | "Changed files" | "Execution evidence" | "Requirements";

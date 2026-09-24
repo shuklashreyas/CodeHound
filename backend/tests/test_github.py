@@ -69,7 +69,7 @@ def test_callback_session_replay_and_logout(monkeypatch):
             assert b"code_verifier=" in request.content
             return httpx.Response(200, json={"access_token": "private-token"})
         assert request.headers["Authorization"] == "Bearer private-token"
-        return httpx.Response(200, json={"login": "octocat", "name": "Octocat"})
+        return httpx.Response(200, json={"id": 1, "login": "octocat", "name": "Octocat"})
 
     monkeypatch.setattr(
         github,
@@ -207,3 +207,29 @@ def test_public_pr_selection_data(monkeypatch):
             ],
             "has_more": False,
         }
+
+
+def test_non_ascii_oauth_state_fails_without_server_error():
+    with TestClient(app) as http:
+        http.cookies.set(github.FLOW_COOKIE, "ascii-cookie")
+        result = http.get(
+            "/api/auth/github/callback", params={"state": "☃", "code": "x"}, follow_redirects=False
+        )
+        assert result.status_code == 303
+        assert "invalid_state" in result.headers["location"]
+
+
+def test_malformed_repository_response_returns_gateway_error(monkeypatch):
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        github,
+        "client",
+        lambda token=None: real_client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json={"unexpected": True})
+            )
+        ),
+    )
+    with TestClient(app) as http:
+        signed_in(http)
+        assert http.get("/api/github/repositories").status_code == 502

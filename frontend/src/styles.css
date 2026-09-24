@@ -1698,3 +1698,18 @@ footer {
     overflow-wrap: anywhere;
   }
 }
+
+.account-error {
+  color: #ad5835;
+  font-size: 10px;
+  text-decoration: underline;
+}
+@media (max-width: 640px) {
+  .github-account {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .account-error {
+    font-size: 8px;
+  }
+}

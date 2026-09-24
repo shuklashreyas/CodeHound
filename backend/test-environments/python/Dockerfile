@@ -1,0 +1,4 @@
+ARG PYTHON_BASE=python:3.12-slim
+FROM ${PYTHON_BASE}
+RUN python -m pip install --no-cache-dir pytest==8.4.2
+ENV PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1

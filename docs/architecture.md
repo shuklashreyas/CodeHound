@@ -1,66 +1,86 @@
-# Architecture and implementation boundaries
+# Architecture and current boundaries
 
-CodeHound asks whether an automated verifier can detect incorrect AI-generated
-patches that still pass visible tests.
+CodeHound asks whether independent verification can detect incorrect patches that
+pass visible tests. Generation and verification must remain separate.
 
-## Planned verification flow
+## Implemented flow
 
-Repository + base commit + issue + candidate patch
-→ isolated original and patched workspaces
-→ visible tests, hidden tests, static checks, and integrity checks
-→ saved execution evidence
-→ per-dimension judgments and a reviewable report.
+```text
+GitHub OAuth → public repository / PR selection
+                        ↓
+              account-owned saved draft
+                        ↓ explicit intake API call
+          immutable PR evidence + review observations
 
-The original revision provides a baseline so pre-existing failures are not
-attributed to the candidate patch. Missing checks must be reported as unknown.
-Numerical confidence will require calibration against independently labeled data.
+captured PR → pinned Git workspaces → baseline/candidate Docker tests → JSON comparison
+trusted fixture code + independent tests → restricted Docker runner → JSON evidence
+```
 
-## Boundaries
+The draft/intake flow is persisted. The operator comparison CLI connects checkout
+and execution; this is not yet a queued web evaluation job. The frontend clearly labels its sample
+report and keeps saved drafts unexecuted. None of these components implements a
+calibrated ML judge, static analyzer, or semantic requirement verifier yet.
 
-- `api`: request validation, evaluation endpoints, and report retrieval.
-- `core`: shared configuration and domain types.
-- `repositories`: revision checkout, diffs, and patch application.
-- `evaluation`: execution orchestration and evidence aggregation.
-- PostgreSQL: planned persistence for tasks, runs, judgments, and artifact metadata.
-- `data/`: ignored local execution artifacts.
-- Frontend: issue, patch, evidence, and final verification views.
+## Components
 
-API liveness and an interactive frontend with sample reports and session-only
-submission drafts are implemented. GitHub OAuth connects the frontend to public repository and open-PR metadata.
-Repository checkout and the evaluation runner are not implemented.
-The database is provisioned locally but has no schema or application integration yet.
+- `api`: authentication, owner-scoped verification endpoints, readiness.
+- `db`: SQLAlchemy storage, Alembic migrations, short transactions, intake leases.
+- `repositories`: strict URL validation, bounded GitHub requests, snapshot capture,
+  and temporary Git workspaces pinned to exact commits.
+- `evaluation`: submission/report contracts and explicit unrun check states.
+- `execution`: operator-controlled Python Docker runner, baseline comparison CLI, and fixture demo.
+- `data/`: ignored local SQLite database and local evidence files.
 
-## Execution isolation
+SQLite keeps development usable without Docker. Compose uses PostgreSQL. Execution
+images are built from trusted definitions, resolved to immutable local IDs, and
+never selected or built from untrusted HTTP input.
 
-The API container is infrastructure, not a sandbox for candidate code. A future
-runner must use disposable, restricted containers with time and resource limits,
-controlled network access, no host secrets, and no host Docker socket exposed to
-candidate code. Hidden tests and trusted result collection must be isolated from
-candidate-controlled test configuration. Do not execute candidate patches in the
-API process or directly on the host.
+## Isolation
+
+Git fetches public commit SHAs without inheriting credentials, Git configuration,
+SSH agents, hooks, or submodule recursion. Repository code is not executed during
+checkout. Checkouts have a total deadline, sampled size/file limits, and cleanup
+on normal completion or errors. Sampled size checks are not disk quotas;
+production workers need dedicated storage quotas and further network restrictions.
+
+The Docker runner uses no network, a read-only root, dropped capabilities, a
+non-root UID, bounded CPU/memory/processes, and a small temporary filesystem.
+Workspaces, independent tests, and the trusted harness are read-only mounts. It does
+not mount the host Docker socket or pass host credentials into the container.
+Candidate pytest config and conftest files do not control test discovery. Both an
+in-container deadline and an outer watchdog bound runtime; output is capped and
+container removal is attempted in a final cleanup block. Host or daemon failure
+can interrupt cleanup; production workers also need orphan-container reconciliation.
+
+Python under test still shares a process with pytest. It can attempt to manipulate
+the test framework or terminate the process. Exit codes and logs are evidence, not
+proof against adversarial code. External test protocols and stronger sandboxing
+remain necessary before claiming adversarial robustness.
+
+## Authentication
+
+OAuth state and PKCE bind sign-in to a browser. Access tokens are stored only in
+process-local server sessions; the browser gets an opaque HttpOnly cookie. HTTPS
+origins use Secure cookies. Requests that mutate records require a custom header
+and the configured origin. Public-only constraints apply to metadata and PR intake.
+Saved ownership uses immutable GitHub IDs. Restarting the API signs users out but
+does not delete saved drafts. Multi-worker deployments need a shared session store.
 
 ## Research evaluation
 
-Compare visible-tests-only, LLM review, static rules plus tests, and CodeHound.
-Keep verifier-accessible hidden tests separate from held-out benchmark checks.
-Split related tasks and patches together to reduce leakage. Measure detection of
-invalid patches among visible-test-passing submissions alongside false positives
-on valid patches. Include human-reviewed labels and reproducible evidence.
+Keep verifier-accessible tests separate from held-out benchmark checks. Split
+related tasks and patches together to avoid leakage. Measure false positives as
+well as detection among visible-test-passing patches. Retain human-reviewed labels,
+baseline failures, environment identities, and reproducible artifacts.
+
+The pagination fixture is public and synthetic. It demonstrates a correct fix
+versus an overfit one, not a benchmark result. Numerical confidence requires
+calibration against independently labeled data.
 
 ## Next milestones
 
-1. Define task, patch, run, evidence, and judgment schemas with database migrations.
-2. Implement repository checkout and patch application in disposable workspaces.
-3. Add isolated execution with baseline comparisons and saved stdout/stderr.
-4. Add hidden-test execution and test-integrity checks.
-5. Build report views and a small reproducible benchmark before learned models.
-
-## GitHub authentication boundary
-
-The API owns the OAuth client secret, PKCE verifier, access token, and expiring
-session data. The browser receives only an opaque HttpOnly cookie and public
-profile/repository metadata. OAuth flows are bound to a random browser cookie and
-consumed once; sign-out requires a same-origin custom-header request. Authenticated
-API responses are marked no-store. Public-only filtering also applies to PR access.
-The process-local session store is suitable only for this single-worker development
-scaffold; deployment requires a shared expiring store and HTTPS.
+1. Queue evaluation jobs and connect checkout, trusted environments, and execution.
+2. Persist original/candidate test evidence with baseline comparisons and retries.
+3. Add structural test-integrity analysis and actual static-analysis results.
+4. Populate the dashboard from real reports, including progress and failure states.
+5. Build a labeled benchmark before training learned evaluators.

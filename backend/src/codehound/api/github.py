@@ -11,6 +11,9 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from codehound.repositories.github_client import GitHubClient, GitHubFailure
+from codehound.repositories.urls import parse_pull_url
+
 router = APIRouter()
 SESSION_COOKIE = "codehound_session"
 FLOW_COOKIE = "codehound_oauth"
@@ -36,7 +39,8 @@ def prune():
     now = time.time()
     for store in (sessions, flows):
         for key in list(store):
-            if store[key]["expires"] <= now:
+            entry = store.get(key)
+            if entry and entry["expires"] <= now:
                 store.pop(key, None)
 
 
@@ -71,22 +75,12 @@ async def github_get(request: Request, path: str, params=None):
     login = session(request)
     try:
         async with client(login["token"]) as http:
-            response = await http.get(f"https://api.github.com{path}", params=params)
-    except httpx.RequestError as exc:
-        raise HTTPException(502, "GitHub could not be reached. Try again.") from exc
-    if response.status_code == 401:
-        sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
-        raise HTTPException(401, "Your GitHub session expired. Sign in again.")
-    if response.status_code in (403, 429):
-        raise HTTPException(503, "GitHub access is restricted or rate limited. Try again later.")
-    if response.status_code == 404:
-        raise HTTPException(404, "This public repository is unavailable.")
-    if response.status_code != 200:
-        raise HTTPException(502, "GitHub returned an unexpected response.")
-    try:
-        return response.json()
-    except ValueError as exc:
-        raise HTTPException(502, "GitHub returned an invalid response.") from exc
+            provider = GitHubClient(login["token"], http_client=http)
+            return await provider.json(path, params=params, allow_list=True)
+    except GitHubFailure as exc:
+        if exc.status == 401:
+            sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
+        raise HTTPException(exc.status, exc.message) from exc
 
 
 @router.get("/auth/session")
@@ -132,7 +126,13 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
     config = settings()
     prune()
     browser_state = request.cookies.get(FLOW_COOKIE, "")
-    if not state or not browser_state or not secrets.compare_digest(state, browser_state):
+    if (
+        not state.isascii()
+        or not browser_state.isascii()
+        or not state
+        or not browser_state
+        or not secrets.compare_digest(state, browser_state)
+    ):
         return RedirectResponse(f"{config['origin']}/?auth_error=invalid_state", status_code=303)
     flow = flows.pop(state, None)
     if not flow:
@@ -160,6 +160,8 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
             )
         response.raise_for_status()
         payload = response.json()
+        if not isinstance(payload, dict):
+            return failed("exchange_failed")
         token = payload.get("access_token")
         if not isinstance(token, str) or not token:
             return failed("exchange_failed")
@@ -167,11 +169,21 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
             response = await http.get("https://api.github.com/user")
         response.raise_for_status()
         profile = response.json()
-        user = {"login": profile["login"], "name": profile.get("name") or profile["login"]}
+        if (
+            not isinstance(profile, dict)
+            or type(profile.get("id")) is not int
+            or profile["id"] <= 0
+        ):
+            return failed("exchange_failed")
+        user = {
+            "id": profile["id"],
+            "login": profile["login"],
+            "name": profile.get("name") or profile["login"],
+        }
         lifetime = min(SESSION_TTL, int(payload.get("expires_in", SESSION_TTL)))
         if lifetime <= 0:
             return failed("exchange_failed")
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, OverflowError):
         return failed("exchange_failed")
     prune()
     if len(sessions) >= 10000:
@@ -212,6 +224,10 @@ async def repositories(request: Request, page: int = Query(1, ge=1, le=10000)):
             "page": page,
         },
     )
+    if not isinstance(data, list) or any(
+        not isinstance(repo, dict) or "id" not in repo or "full_name" not in repo for repo in data
+    ):
+        raise HTTPException(502, "GitHub returned malformed repository metadata.")
     return {
         "repositories": [
             {
@@ -230,11 +246,13 @@ async def repositories(request: Request, page: int = Query(1, ge=1, le=10000)):
 
 @router.get("/github/repositories/{owner}/{repo}/pulls")
 async def pulls(request: Request, owner: str, repo: str, page: int = Query(1, ge=1, le=10000)):
-    import re
-
-    if not re.fullmatch(r"[\w.-]+", owner) or not re.fullmatch(r"[\w.-]+", repo):
-        raise HTTPException(400, "Invalid repository name.")
+    try:
+        parse_pull_url(f"https://github.com/{owner}/{repo}/pull/1")
+    except ValueError as exc:
+        raise HTTPException(400, "Invalid repository name.") from exc
     metadata = await github_get(request, f"/repos/{owner}/{repo}")
+    if not isinstance(metadata, dict):
+        raise HTTPException(502, "GitHub returned malformed repository metadata.")
     if metadata.get("private", True):
         raise HTTPException(403, "Only public repositories are supported.")
     data = await github_get(
@@ -248,6 +266,10 @@ async def pulls(request: Request, owner: str, repo: str, page: int = Query(1, ge
             "page": page,
         },
     )
+    if not isinstance(data, list) or any(
+        not isinstance(pr, dict) or "number" not in pr or "title" not in pr for pr in data
+    ):
+        raise HTTPException(502, "GitHub returned malformed pull request metadata.")
     return {
         "pulls": [
             {
