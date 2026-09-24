@@ -20,7 +20,7 @@ trusted fixture code + independent tests → restricted Docker runner → JSON e
 Drafts, intake, queued execution, cancellation, and results are persisted. The
 execution API accepts only a matching operator-owned profile ID. A separate worker
 claims jobs with expiring leases and keeps assertions outside candidate containers.
-The frontend still needs controls for this flow and clearly labels its sample report. None of these components implements a
+The frontend connects this flow and keeps its illustrative sample separate from real execution evidence. None of these components implements a
 calibrated ML judge, static analyzer, or semantic requirement verifier yet.
 
 ## Components
@@ -82,7 +82,7 @@ calibration against independently labeled data.
 
 ## Next milestones
 
-1. Connect the dashboard to intake and queued execution with real evidence.
+1. Broaden independently controlled repository profiles and benchmark patch detection.
 2. Add operator-owned profiles for more repository contracts.
 3. Add structural integrity analysis and static-analysis results.
 4. Harden worker storage quotas, account quotas, and orphan cleanup.

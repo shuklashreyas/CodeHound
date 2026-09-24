@@ -25,10 +25,12 @@ execution, hidden tests, patch integrity checks, and repository context.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
   fix passes visible tests but fails independent cases.
 
-The web dashboard does **not** launch repository code. Snapshot intake is available
-through the API. A standalone comparison command connects pinned checkouts to
-independent tests. Queued execution and persistent results are available through
-the API and separate worker.
+The signed-in dashboard connects the full flow: **capture PR → select an operator
+profile → run both revisions → compare evidence**. It shows live progress,
+cancellation, execution history, changed files, per-case outcomes, and JSON exports.
+The separate worker executes code; the web/API process queues jobs. Repositories
+without an operator-owned profile cannot run yet. The bundled CodeHound profile
+checks only PR URL parsing, not entire PR correctness.
 A `ready` intake record means evidence was captured, not that the patch is correct.
 Unexecuted checks remain `not_run`, and confidence is unscored.
 
@@ -226,6 +228,6 @@ integration checks. Set `CODEHOUND_TEST_IMAGE_ID` to the trusted Docker image ID
 enable actual container tests. CI runs PostgreSQL and Docker integration jobs as
 well as frontend tests and the production build.
 
-See [architecture and remaining boundaries](docs/architecture.md). Next: connect
-the dashboard to intake and queued execution, and broaden independently retained
-test profiles.
+See [architecture and remaining boundaries](docs/architecture.md) and the
+[dashboard walkthrough](docs/dashboard.md). Next: broaden independently retained
+test profiles and benchmark their ability to catch misleading patches.
