@@ -9,7 +9,7 @@ execution, hidden tests, patch integrity checks, and repository context.
 ## What works today
 
 - **GitHub sign-in:** browse public repositories and select an open PR.
-- **Dashboard:** all 13 planned verification dimensions, clearly labeled sample
+- **Dashboard:** all 13 verification dimensions, clearly labeled sample
   evidence, filters, changed files, requirements, and report export.
 - **Saved drafts:** signed-in submissions are stored by GitHub account and restored
   on refresh. Signed-out drafts remain session-only. The UI loads the latest 100.

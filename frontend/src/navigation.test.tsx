@@ -131,3 +131,22 @@ it("restores the saved verification after the OAuth return", async () => {
   await screen.findByText("Saved evidence saved-one");
   expect(window.location.search).toBe("?verification=saved-one");
 });
+
+it("distinguishes scoped live capabilities from planned checks", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => response({ configured: true, user: null })),
+  );
+  render(<App />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Check coverage" }),
+  );
+  expect(screen.getAllByText("Scoped evidence")).toHaveLength(7);
+  expect(screen.getAllByText("Planned")).toHaveLength(6);
+  expect(screen.queryByText(/None are connected to a live runner/)).toBeNull();
+  expect(
+    screen.getByText(
+      /General lint, type, and security analysis are not implemented/,
+    ),
+  ).toBeTruthy();
+});
