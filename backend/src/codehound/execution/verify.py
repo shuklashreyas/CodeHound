@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 
 from codehound.execution.docker import DockerRunner
+from codehound.execution.independent import IndependentRunner
+from codehound.execution.profiles import TrustedSuite
 from codehound.execution.results import compare_tests, summarize_comparisons
 from codehound.repositories.checkout import GitWorkspace
 from codehound.repositories.urls import parse_pull_url
@@ -46,7 +48,11 @@ def comparison(baseline, candidate):
     return compare_tests(baseline, candidate)["verdict"]
 
 
-async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWorkspace):
+async def verify_snapshot(
+    snapshot, suites, runner, *, workspace_factory=GitWorkspace, mode="pytest"
+):
+    if mode not in ("pytest", "independent"):
+        raise ValueError("Unsupported evaluator mode.")
     if snapshot.get("schema_version") != 1:
         raise ValueError("Unsupported snapshot schema.")
     reference = parse_pull_url(snapshot["pull_request"]["url"])
@@ -58,15 +64,23 @@ async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWork
         raise ValueError("Snapshot diff checksum does not match.")
     if not suites or set(suites) - {"visible", "hidden"}:
         raise ValueError("Provide visible and/or independent hidden tests.")
-    identities = {name: suite_digest(path) for name, path in suites.items()}
+
+    def identity(path):
+        return TrustedSuite.load(path).sha256 if mode == "independent" else suite_digest(path)
+
+    identities = {name: identity(path) for name, path in suites.items()}
+    prepared = {
+        name: TrustedSuite.load(path) if mode == "independent" else path
+        for name, path in suites.items()
+    }
     results = {}
     async with workspace_factory(
         reference.repository, snapshot["base_sha"], snapshot["head_sha"]
     ) as checkouts:
         for name, tests in suites.items():
-            baseline = await runner.run(checkouts.baseline, tests)
-            candidate = await runner.run(checkouts.candidate, tests)
-            if suite_digest(tests) != identities[name]:
+            baseline = await runner.run(checkouts.baseline, prepared[name])
+            candidate = await runner.run(checkouts.candidate, prepared[name])
+            if identity(tests) != identities[name]:
                 raise ValueError("Independent tests changed during execution; discard this run.")
             results[name] = {
                 "test_suite_sha256": identities[name],
@@ -77,6 +91,7 @@ async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWork
             }
     return {
         "schema_version": 2,
+        "evaluation_mode": mode,
         "pr_url": reference.url,
         "base_sha": snapshot["base_sha"],
         "head_sha": snapshot["head_sha"],
@@ -87,7 +102,11 @@ async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWork
         "limitations": [
             "Only the supplied operator-owned Python test suites were executed.",
             "Passing tests do not establish full requirement coverage or patch integrity.",
-            "Tests share a Python process with candidate code; reports can be manipulated.",
+            (
+                "Tests share a Python process with candidate code; reports can be manipulated."
+                if mode == "pytest"
+                else "Only configured JSON function behavior is checked."
+            ),
             "Repository dependencies must already be present in the trusted image.",
         ],
     }
@@ -101,17 +120,19 @@ def main():
     parser.add_argument("--image-id", required=True)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--mode", choices=("pytest", "independent"), default="pytest")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output already exists. Choose a new evidence file.")
     if args.snapshot.stat().st_size > 32 * 1024 * 1024:
         parser.error("Snapshot exceeds 32 MiB.")
-    runner = DockerRunner(args.image_id, timeout_seconds=args.timeout)
+    runner_class = IndependentRunner if args.mode == "independent" else DockerRunner
+    runner = runner_class(args.image_id, timeout_seconds=args.timeout)
     snapshot = json.loads(args.snapshot.read_text())
     suites = {"visible": args.visible_tests}
     if args.hidden_tests:
         suites["hidden"] = args.hidden_tests
-    result = asyncio.run(verify_snapshot(snapshot, suites, runner))
+    result = asyncio.run(verify_snapshot(snapshot, suites, runner, mode=args.mode))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x") as output:
         json.dump(result, output, indent=2)

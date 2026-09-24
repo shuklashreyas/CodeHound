@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "module": "pagination",
+  "function": "pages",
+  "timeout_seconds": 5,
+  "name": "pagination-visible",
+  "cases": [
+    {
+      "id": "complete-pages",
+      "args": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        2
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ]
+      }
+    },
+    {
+      "id": "issue-example",
+      "args": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        2
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            5
+          ]
+        ]
+      }
+    }
+  ]
+}

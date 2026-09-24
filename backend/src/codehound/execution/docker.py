@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -36,6 +36,8 @@ class ExecutionResult:
     evidence_error: str | None = None
     evaluator_sha256: str | None = None
     evidence_source: str = "in_process_pytest"
+    call_response: dict | None = None
+    case_evidence: list[dict] | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -69,7 +71,7 @@ async def control(*args, timeout=15):
     return process.returncode, stdout[:8192], stderr[:8192]
 
 
-class DockerRunner:
+class ContainerRunner:
     def __init__(self, image_id: str, *, timeout_seconds=30, output_limit=1_000_000):
         # A locally built, immutable image ID; never pull caller-selected images at runtime.
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
@@ -82,9 +84,8 @@ class DockerRunner:
         self.timeout = timeout_seconds
         self.output_limit = output_limit
 
-    def create_args(self, name: str, workspace: Path, tests: Path, token="test"):
-        harness = mount_path(Path(__file__).parent)
-        return [
+    def container_args(self, name, workspace, mounts, command, *, interactive=False):
+        args = [
             "create",
             "--name",
             name,
@@ -108,32 +109,33 @@ class DockerRunner:
             "/tmp:rw,noexec,nosuid,nodev,size=67108864,mode=1777",
             "--mount",
             f"type=bind,src={mount_path(workspace)},dst=/workspace,readonly",
-            "--mount",
-            f"type=bind,src={mount_path(tests)},dst=/tests,readonly",
-            "--mount",
-            f"type=bind,src={harness},dst=/harness,readonly",
-            "--env",
-            "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
-            "--env",
-            "PYTHONDONTWRITEBYTECODE=1",
-            self.image_id,
-            "/usr/bin/timeout",
-            "--signal=KILL",
-            str(self.timeout),
-            "python",
-            "-I",
-            "/harness/pytest_runner.py",
-            token,
         ]
+        for source, destination in mounts:
+            args.extend(
+                ["--mount", f"type=bind,src={mount_path(source)},dst={destination},readonly"]
+            )
+        if interactive:
+            args.append("--interactive")
+        args.extend(
+            [
+                "--env",
+                "PYTHONDONTWRITEBYTECODE=1",
+                "--env",
+                "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+                self.image_id,
+                "/usr/bin/timeout",
+                "--signal=KILL",
+                str(self.timeout),
+                *command,
+            ]
+        )
+        return args
 
-    async def run(self, workspace: Path, tests: Path):
+    async def run_container(self, workspace, mounts, command, *, input_data=None):
         name = f"codehound-{uuid4().hex}"
-        token = uuid4().hex
-        args = self.create_args(name, workspace, tests, token)
-        harness = Path(__file__).parent
-        evaluator_sha256 = hashlib.sha256(
-            (harness / "pytest_runner.py").read_bytes() + (harness / "pytest.ini").read_bytes()
-        ).hexdigest()
+        args = self.container_args(
+            name, workspace, mounts, command, interactive=input_data is not None
+        )
         start = time.monotonic()
         process = None
         stdout = bytearray()
@@ -160,11 +162,22 @@ class DockerRunner:
                 "docker",
                 "start",
                 "--attach",
+                *(["--interactive"] if input_data is not None else []),
                 name,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=asyncio.subprocess.PIPE
+                if input_data is not None
+                else asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            if input_data is not None:
+                try:
+                    process.stdin.write(input_data)
+                    await asyncio.wait_for(process.stdin.drain(), timeout=5)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                finally:
+                    process.stdin.close()
             limit_reached = asyncio.Event()
 
             async def read(stream, target):
@@ -216,27 +229,16 @@ class DockerRunner:
             )
             if output_truncated:
                 status = "output_limit"
-            output = stdout.decode(errors="replace")
-            test_report, evidence_error = decode_report(output, token, exit_code)
-            if test_report is not None:
-                output = "\n".join(
-                    line
-                    for line in output.splitlines()
-                    if not line.startswith(PREFIX + token + ":")
-                )
             return ExecutionResult(
                 status,
                 exit_code,
-                output,
+                stdout.decode(errors="replace"),
                 stderr.decode(errors="replace"),
                 round(time.monotonic() - start, 3),
                 self.image_id,
                 output_truncated,
                 oom_killed,
                 self.timeout,
-                test_report=test_report,
-                evidence_error=evidence_error,
-                evaluator_sha256=evaluator_sha256,
             )
         except (FileNotFoundError, OSError, TimeoutError, ValueError, KeyError):
             return ExecutionResult(
@@ -258,3 +260,41 @@ class DockerRunner:
                 await control("rm", "--force", name, timeout=10)
             except (OSError, TimeoutError):
                 pass
+
+
+class DockerRunner(ContainerRunner):
+    """Compatibility pytest runner; assertions share a process with candidate code."""
+
+    def create_args(self, name, workspace, tests, token="test"):
+        return self.container_args(
+            name,
+            workspace,
+            [(tests, "/tests"), (Path(__file__).parent, "/harness")],
+            ["python", "-I", "/harness/pytest_runner.py", token],
+        )
+
+    async def run(self, workspace: Path, tests: Path):
+        token = uuid4().hex
+        harness = Path(__file__).parent
+        before = hashlib.sha256(
+            (harness / "pytest_runner.py").read_bytes() + (harness / "pytest.ini").read_bytes()
+        ).hexdigest()
+        result = await self.run_container(
+            workspace,
+            [(tests, "/tests"), (harness, "/harness")],
+            ["python", "-I", "/harness/pytest_runner.py", token],
+        )
+        report, error = decode_report(result.stdout, token, result.exit_code)
+        output = result.stdout
+        if report is not None:
+            output = "\n".join(
+                line for line in output.splitlines() if not line.startswith(PREFIX + token + ":")
+            )
+        after = hashlib.sha256(
+            (harness / "pytest_runner.py").read_bytes() + (harness / "pytest.ini").read_bytes()
+        ).hexdigest()
+        if before != after:
+            report, error = None, "evaluator_changed"
+        return replace(
+            result, stdout=output, test_report=report, evidence_error=error, evaluator_sha256=before
+        )

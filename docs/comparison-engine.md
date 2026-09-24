@@ -46,8 +46,9 @@ not a secret or a signature.
 Malicious code can inspect memory, monkeypatch pytest, or forge reports. Structured
 validation catches accidental or obvious interference but does not prove tamper
 resistance. The evidence explicitly identifies its source as `in_process_pytest`.
-A separate evaluator process that judges only candidate outputs is required for
-stronger independence; no result here claims that boundary already exists.
+The separate [JSON evaluator](independent-evaluator.md) judges candidate outputs
+outside Docker for supported function contracts. This stronger boundary applies
+only when the report identifies `external_json_assertions`, not to pytest runs.
 
 ## Reproducible example
 
