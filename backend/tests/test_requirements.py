@@ -119,3 +119,17 @@ def test_passing_examples_do_not_mark_entire_issue_solved():
     evidence["requirement_evidence"] = requirement_evidence(profile(), evidence)
     execution_checks(checks, SimpleNamespace(status="completed", artifact=evidence))
     assert by_name["requirement_adherence"].status == "fail"
+
+
+def test_partial_valid_evidence_retains_requirement_contradiction():
+    evidence = artifact(
+        hidden={"url-independent::credentials": "failed", "url-independent::wrong-host": "not_run"}
+    )
+    run = evidence["suites"]["hidden"]["candidate"]
+    run["status"] = "timeout"
+    run["exit_code"] = run["test_report"]["exit_code"] = 2
+    result = requirement_evidence(profile(), evidence)
+    requirement = result["requirements"][1]
+    assert requirement["candidate"]["status"] == "contradicted"
+    assert requirement["candidate"]["failed"] == 1
+    assert requirement["candidate"]["unverified"] == 1

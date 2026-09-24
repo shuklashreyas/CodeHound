@@ -39,6 +39,7 @@ class TrustedSuite(Contract):
     source_directory: str = Field(default="src", pattern=r"^[A-Za-z0-9_./-]{1,200}$")
     result_encoding: Literal["json", "dataclass"] = "json"
     timeout_seconds: int = Field(default=5, ge=1, le=10)
+    suite_timeout_seconds: int = Field(default=120, ge=1, le=120)
     cases: list[TestCase] = Field(min_length=1, max_length=50)
 
     @model_validator(mode="after")

@@ -192,3 +192,50 @@ def answer(value):
     assert result.test_report["tests"][0]["outcome"] == "error"
     assert result.case_evidence[0]["observation"]["evidence_error"] == "invalid_response"
     assert compare_tests(result, result)["verdict"] == "inconclusive"
+
+
+@pytest.mark.skipif(
+    not os.getenv("CODEHOUND_TEST_IMAGE_ID"), reason="Trusted Docker image required"
+)
+def test_real_suite_deadline_keeps_observed_regression(tmp_path):
+    from codehound.execution.results import compare_tests
+
+    baseline, candidate = tmp_path / "baseline", tmp_path / "candidate"
+    for directory in (baseline, candidate):
+        directory.mkdir(mode=0o755)
+    (baseline / "subject.py").write_text("def value(index): return index\n")
+    (candidate / "subject.py").write_text(
+        "import time\ndef value(index):\n    if index: time.sleep(10)\n    return -1\n"
+    )
+    suite = TrustedSuite.model_validate(
+        {
+            "name": "deadline",
+            "module": "subject",
+            "function": "value",
+            "source_directory": ".",
+            "timeout_seconds": 1,
+            "suite_timeout_seconds": 2,
+            "cases": [
+                {
+                    "id": f"case-{index}",
+                    "args": [index],
+                    "expect": {"kind": "value", "value": index},
+                }
+                for index in range(3)
+            ],
+        }
+    )
+
+    async def run():
+        runner = IndependentRunner(os.environ["CODEHOUND_TEST_IMAGE_ID"])
+        before = await runner.run(baseline, suite)
+        after = await runner.run(candidate, suite)
+        assert after.status == "timeout" and after.timeout_seconds == 2
+        assert any(case["outcome"] == "not_run" for case in after.test_report["tests"])
+        result = compare_tests(before, after)
+        assert result["verdict"] == "regression_detected"
+        assert result["regressions"][0]["nodeid"] == "deadline::case-0"
+        assert result["counts"]["unverified"] == 2
+        assert any("timeout" in reason for reason in result["reasons"])
+
+    asyncio.run(run())

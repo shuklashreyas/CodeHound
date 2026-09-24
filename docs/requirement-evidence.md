@@ -31,7 +31,7 @@ Add this field to a complete server-owned evaluation profile, not a candidate re
 - **Evidence incomplete:** a mapped case is missing, errored, skipped, or came from an invalid/incomparable execution.
 - **No checks mapped:** the requirement is declared but has no evidence.
 
-The dashboard shows both revisions and individual case transitions. Exports retain the same evidence. Cases without requirement mappings are counted separately.
+The dashboard shows both revisions and individual case transitions. Exports retain the same evidence. Cases without requirement mappings are counted separately. Valid observations made before an external suite deadline remain usable: a known failure can contradict a requirement even when another mapped case did not run. Missing or invalid evidence never becomes a pass.
 
 This is explicit traceability, not automatic interpretation of issue text. The operator defines the contract. CodeHound does not establish that these requirements completely describe the submitted issue, and passing examples do not prove a general requirement. The overall requirement-adherence check therefore remains **unknown** when all mapped examples pass; a contradiction is reported as a failure of the operator-defined contract. Full task completion remains unverified.
 
