@@ -71,7 +71,8 @@ All 13 correctness checks begin as `not_run`. After intake, test integrity becom
 `needs_review` if test/configuration paths changed, otherwise `unknown`. Filename
 heuristics cannot prove assertion strength, absence of hardcoding, or correctness.
 No check is assigned `pass` by intake. `confidence` stays null and
-`execution_status` stays `not_run` until an evaluator is integrated.
+`execution_status` starts as `not_run`; queued execution updates it independently
+of intake state. See [execution jobs](execution-jobs.md) for the evaluator API.
 
 ## Storage and exports
 

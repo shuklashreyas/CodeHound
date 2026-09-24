@@ -10,7 +10,10 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from codehound.api import github
-from codehound.db.store import StoreConflict, VerificationStore, utc
+from codehound.core.time import utc
+from codehound.db.jobs import JobStore
+from codehound.db.store import StoreConflict, VerificationStore
+from codehound.evaluation.job_schemas import execution_checks, job_summary
 from codehound.evaluation.schemas import (
     VerificationCreate,
     VerificationList,
@@ -60,7 +63,7 @@ def summary(item):
     )
 
 
-def report(item):
+def report(item, latest=None):
     checks = unrun_checks()
     if item.snapshot:
         test_changes = [
@@ -79,8 +82,14 @@ def report(item):
             if test_changes
             else "No test-path changes were identified; assertion integrity is unverified."
         )
+    execution_checks(checks, latest)
     return VerificationReport(
-        **summary(item).model_dump(), snapshot=item.snapshot, attempts=item.attempts, checks=checks
+        **summary(item).model_dump(),
+        snapshot=item.snapshot,
+        attempts=item.attempts,
+        checks=checks,
+        execution_status=latest.status if latest else "not_run",
+        latest_execution=job_summary(latest) if latest else None,
     )
 
 
@@ -129,7 +138,7 @@ def get_verification(identifier: UUID, login=Depends(principal), database=Depend
     item = database.get(str(identifier), login["user"]["id"])
     if not item:
         raise HTTPException(404, "Verification not found.")
-    return report(item)
+    return report(item, JobStore(database).latest(item.id, login["user"]["id"]))
 
 
 @router.post(
@@ -148,7 +157,7 @@ async def intake_verification(
     if item is None:
         raise HTTPException(404, "Verification not found.")
     if claim is None:
-        return report(item)
+        return report(item, JobStore(database).latest(item.id, login["user"]["id"]))
     snapshot = None
     failure = None
     try:
@@ -171,7 +180,7 @@ async def intake_verification(
         )
     except StoreConflict as exc:
         raise HTTPException(409, str(exc)) from exc
-    return report(item)
+    return report(item, JobStore(database).latest(item.id, login["user"]["id"]))
 
 
 @router.get("/{identifier}/export")
@@ -180,7 +189,9 @@ def export_verification(identifier: UUID, login=Depends(principal), database=Dep
     if not item:
         raise HTTPException(404, "Verification not found.")
     return JSONResponse(
-        report(item).model_dump(mode="json"),
+        report(item, JobStore(database).latest(item.id, login["user"]["id"])).model_dump(
+            mode="json"
+        ),
         headers={
             "Content-Disposition": f'attachment; filename="codehound-{identifier}.json"',
             "X-Content-Type-Options": "nosniff",

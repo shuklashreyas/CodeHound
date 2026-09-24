@@ -16,10 +16,6 @@ class StoreConflict(Exception):
     pass
 
 
-def utc(value):
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
-
 class VerificationStore:
     def __init__(self, database):
         self.engine = database.engine

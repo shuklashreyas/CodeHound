@@ -55,3 +55,52 @@ def test_postgresql_migration_persistence_and_claims():
             reopened.close()
     finally:
         database.close()
+
+
+@pytest.mark.skipif(
+    not os.getenv("CODEHOUND_TEST_POSTGRES_URL"), reason="Isolated PostgreSQL not configured"
+)
+def test_postgresql_execution_cancellation_and_json_evidence():
+    from codehound.db.jobs import JobStore
+    from codehound.evaluation.registry import load_profiles
+
+    database = Database(os.environ["CODEHOUND_TEST_POSTGRES_URL"])
+    try:
+        database.migrate()
+        store, jobs = VerificationStore(database), JobStore(database)
+        owner = uuid4().int % (2**62)
+        body = VerificationCreate(
+            pr_url="https://github.com/shuklashreyas/CodeHound/pull/1",
+            issue_text="Check public URL parsing independently.",
+        )
+        record, _ = store.create(owner, "pg-test", body)
+        _, token = store.claim(record.id, owner)
+        store.finish(
+            record.id,
+            token,
+            snapshot={
+                "pull_request": {"title": "Contract check"},
+                "base_sha": "a" * 40,
+                "head_sha": "b" * 40,
+                "diff_sha256": "c" * 64,
+            },
+        )
+        profile = load_profiles()["codehound-url-contract"]
+        job, _ = jobs.enqueue(record.id, owner, profile, "sha256:" + "d" * 64)
+        claimed = jobs.claim()
+        assert claimed.id == job.id
+        jobs.cancel(job.id, owner)
+        jobs.finish(
+            job.id, claimed.claim_token, artifact={"assessment": {"verdict": "candidate_improves"}}
+        )
+        result = jobs.get(job.id, owner)
+        assert (
+            result.status == "cancelled" and result.artifact is None and result.assessment is None
+        )
+        fresh, _ = jobs.enqueue(record.id, owner, profile, "sha256:" + "d" * 64)
+        claimed = jobs.claim()
+        evidence = {"assessment": {"verdict": "incomplete"}, "suites": {}}
+        jobs.finish(fresh.id, claimed.claim_token, artifact=evidence)
+        assert jobs.get(fresh.id, owner).artifact == evidence
+    finally:
+        database.close()
