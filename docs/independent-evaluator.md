@@ -60,7 +60,8 @@ The target must load from `/workspace`, including its `src/` directory, so a
 package accidentally resolved from the image cannot stand in for candidate code.
 
 Profiles are capped at 32 KiB and 50 cases. A case has a 1–10 second execution
-limit; the complete suite has a 120-second deadline. Each observation is capped at
+limit; `suite_timeout_seconds` sets the complete suite deadline (1–120 seconds,
+default 120). Each observation is capped at
 16 KiB. The report retains observed outputs and runtime evidence, hashes the
 profile/evaluator, and labels its source `external_json_assertions`. Expected
 answers are not copied into execution reports.
@@ -112,3 +113,9 @@ The transport nonce is a frame identifier, **not a secret or authenticity proof*
 Candidate code can print a frame. The independent protection is that the controller
 retains expected answers and judges the returned observable data outside that
 process. Passing a known input still does not rule out hardcoding or overfitting.
+
+A valid partial external report retains observations obtained before a suite timeout.
+Known pass-to-fail transitions remain regressions even when other checks did not run.
+Partial improvements cannot produce an overall improvement verdict. Reports with
+invalid structure, missing evidence, or mismatched evaluator identities remain
+unusable. Timeout and collection reasons stay attached to the comparison.

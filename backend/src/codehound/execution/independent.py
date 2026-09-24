@@ -149,7 +149,7 @@ class IndependentRunner(ContainerRunner):
         tests, evidence = [], []
         status = "completed"
         try:
-            async with asyncio.timeout(120):
+            async with asyncio.timeout(profile.suite_timeout_seconds):
                 for case in profile.cases:
                     observation = await runner.observe(workspace, profile, case)
                     outcome, message = judge(case, observation)
@@ -191,7 +191,7 @@ class IndependentRunner(ContainerRunner):
             self.image_id,
             False,
             False,
-            120,
+            profile.suite_timeout_seconds,
             test_report=report,
             evaluator_sha256=evaluator,
             evidence_source="external_json_assertions",

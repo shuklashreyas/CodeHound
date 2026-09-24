@@ -193,53 +193,64 @@ it("explains unavailable image and offline worker without manufacturing a verdic
   expect(screen.queryByText("Improvement observed")).toBeNull();
 });
 
-it("shows an independent regression and baseline/candidate transitions", async () => {
-  const comparison = {
-    verdict: "regression_detected",
-    reasons: [],
-    counts: { regressions: 1, improvements: 1 },
-    regressions: [{ nodeid: "empty_input", before: "passed", after: "failed" }],
-    improvements: [
-      { nodeid: "partial_page", before: "failed", after: "passed" },
-    ],
-    unresolved: [],
-    unverified: [],
-    unchanged_passes: [],
-    missing_tests: [],
-    added_tests: [],
-  };
-  const complete = {
-    ...queued,
-    status: "completed",
-    assessment: {
+it.each([false, true])(
+  "shows independent regression evidence (partial=%s)",
+  async (partial) => {
+    const comparison = {
       verdict: "regression_detected",
-      signals: ["visible_improvement_with_independent_regression"],
-    },
-    artifact: {
-      suites: {
-        hidden: {
-          baseline: { stdout: "<script>alert(1)</script>" },
-          candidate: {},
-          test_comparison: comparison,
-        },
+      reasons: partial ? ["candidate: timeout, exit 2"] : [],
+      counts: { regressions: 1, improvements: 1, unverified: partial ? 1 : 0 },
+      regressions: [
+        { nodeid: "empty_input", before: "passed", after: "failed" },
+      ],
+      improvements: [
+        { nodeid: "partial_page", before: "failed", after: "passed" },
+      ],
+      unresolved: [],
+      unverified: partial
+        ? [{ nodeid: "unfinished", before: "passed", after: "not_run" }]
+        : [],
+      unchanged_passes: [],
+      missing_tests: [],
+      added_tests: [],
+    };
+    const complete = {
+      ...queued,
+      status: "completed",
+      assessment: {
+        verdict: "regression_detected",
+        signals: ["visible_improvement_with_independent_regression"],
       },
-      limitations: ["Only configured behavior checked."],
-    },
-  };
-  harness({
-    report: { ...draft, status: "ready", snapshot },
-    jobs: [complete],
-    detail: complete,
-  });
-  render(<Verification id="v1" onUnauthorized={vi.fn()} />);
-  await screen.findByText("empty_input");
-  expect(screen.getAllByText("Regression detected").length).toBe(2);
-  expect(screen.getByText("partial_page")).toBeTruthy();
-  expect(
-    screen.getByText(/Full requirement adherence remains unverified/),
-  ).toBeTruthy();
-  expect(document.querySelector("script")).toBeNull();
-});
+      artifact: {
+        suites: {
+          hidden: {
+            baseline: { stdout: "<script>alert(1)</script>" },
+            candidate: {},
+            test_comparison: comparison,
+          },
+        },
+        limitations: ["Only configured behavior checked."],
+      },
+    };
+    harness({
+      report: { ...draft, status: "ready", snapshot },
+      jobs: [complete],
+      detail: complete,
+    });
+    render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+    await screen.findByText("empty_input");
+    expect(screen.getAllByText("Regression detected").length).toBe(2);
+    expect(screen.getByText("partial_page")).toBeTruthy();
+    if (partial) {
+      expect(screen.getByText("candidate: timeout, exit 2")).toBeTruthy();
+      expect(screen.getByText("unfinished")).toBeTruthy();
+    }
+    expect(
+      screen.getByText(/Full requirement adherence remains unverified/),
+    ).toBeTruthy();
+    expect(document.querySelector("script")).toBeNull();
+  },
+);
 
 it("refreshes authentication on an expired session", async () => {
   const refresh = vi.fn();

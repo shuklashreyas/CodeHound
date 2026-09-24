@@ -6,7 +6,11 @@ from codehound.execution.results import validate_report
 def case_outcomes(run):
     if (
         not run
-        or run.get("status") != "completed"
+        or not (
+            run.get("status") == "completed"
+            or (run.get("status") == "timeout" and run.get("exit_code") == 2)
+        )
+        or run.get("exit_code") not in (0, 1, 2)
         or run.get("evidence_error")
         or run.get("evidence_source") != "external_json_assertions"
     ):

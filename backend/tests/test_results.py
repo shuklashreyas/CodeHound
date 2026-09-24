@@ -146,3 +146,51 @@ def test_independent_existing_failures_are_not_called_regressions():
     result = summarize_comparisons(suites)
     assert result["verdict"] == "incomplete"
     assert result["signals"] == ["visible_improvement_with_unresolved_independent_tests"]
+
+
+def test_valid_partial_external_evidence_preserves_a_known_regression():
+    before = replace(
+        execution({"broken": "passed", "unfinished": "passed"}),
+        evidence_source="external_json_assertions",
+    )
+    after = replace(
+        execution({"broken": "failed", "unfinished": "not_run"}, exit_code=2),
+        status="timeout",
+        evidence_source="external_json_assertions",
+    )
+    result = compare_tests(before, after)
+    assert result["verdict"] == "regression_detected"
+    assert result["regressions"] == [{"nodeid": "broken", "before": "passed", "after": "failed"}]
+    assert result["counts"]["unverified"] == 1
+    assert any("timeout" in reason for reason in result["reasons"])
+
+
+def test_partial_improvement_is_retained_but_cannot_claim_success():
+    before = replace(
+        execution({"fixed": "failed", "unfinished": "passed"}),
+        evidence_source="external_json_assertions",
+    )
+    after = replace(
+        execution({"fixed": "passed", "unfinished": "not_run"}, exit_code=2),
+        status="timeout",
+        evidence_source="external_json_assertions",
+    )
+    result = compare_tests(before, after)
+    assert result["verdict"] == "inconclusive"
+    assert result["counts"]["improvements"] == 1
+    for invalid in (
+        replace(after, evaluator_sha256="changed"),
+        replace(after, evidence_error="invalid_response"),
+        replace(after, status="unavailable"),
+    ):
+        result = compare_tests(before, invalid)
+        assert result["verdict"] == "inconclusive" and not result["improvements"]
+
+
+def test_completed_collection_failure_preserves_valid_shared_outcomes():
+    before = execution({"broken": "passed"})
+    after = execution({"broken": "failed"}, exit_code=2)
+    after.test_report["collection_errors"] = ["Additional test module could not be collected"]
+    result = compare_tests(before, after)
+    assert result["verdict"] == "regression_detected"
+    assert "Test collection failed." in result["reasons"]

@@ -96,23 +96,36 @@ def compare_tests(baseline, candidate):
         "reasons": [],
         "counts": {},
     }
+    valid_evidence = True
     if (baseline.image_id, baseline.evaluator_sha256, baseline.evidence_source) != (
         candidate.image_id,
         candidate.evaluator_sha256,
         candidate.evidence_source,
     ):
         result["reasons"].append("Execution image or evaluator changed between revisions.")
+        valid_evidence = False
     for label, run in (("baseline", baseline), ("candidate", candidate)):
         if run.status != "completed" or run.exit_code not in (0, 1):
             result["reasons"].append(f"{label}: {run.status}, exit {run.exit_code}")
+        if run.exit_code not in (0, 1, 2) or (
+            run.status != "completed"
+            and not (
+                run.status == "timeout"
+                and run.exit_code == 2
+                and run.evidence_source == "external_json_assertions"
+            )
+        ):
+            valid_evidence = False
         if run.evidence_error or run.test_report is None:
+            valid_evidence = False
             result["reasons"].append(f"{label}: {run.evidence_error or 'missing_report'}")
         else:
             try:
                 validate_report(run.test_report, run.exit_code)
             except (ValueError, TypeError, KeyError):
                 result["reasons"].append(f"{label}: invalid_report")
-    if result["reasons"]:
+                valid_evidence = False
+    if not valid_evidence:
         return result
     old = {case["nodeid"]: case for case in baseline.test_report["tests"]}
     new = {case["nodeid"]: case for case in candidate.test_report["tests"]}
