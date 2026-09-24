@@ -14,6 +14,7 @@ from codehound.db.database import Database
 from codehound.db.jobs import JobStore
 from codehound.db.store import StoreConflict, VerificationStore
 from codehound.evaluation.registry import EvaluationProfile
+from codehound.evaluation.requirements import requirement_evidence
 from codehound.execution.cleanup import reconcile
 from codehound.execution.docker import control
 from codehound.execution.independent import IndependentRunner
@@ -65,6 +66,7 @@ async def execute_job(job, database, executor=verify_snapshot):
                 integrity_analyzer=analyze_test_integrity,
             )
     artifact["profile"] = profile.public()
+    artifact["requirement_evidence"] = requirement_evidence(profile, artifact)
     return artifact
 
 

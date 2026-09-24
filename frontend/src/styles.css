@@ -2002,3 +2002,16 @@ footer {
     gap: 14px;
   }
 }
+
+.requirement-cases {
+  padding-left: 1.2rem;
+}
+.requirement-cases li {
+  margin: 0.6rem 0;
+  overflow-wrap: anywhere;
+}
+.requirement-cases li span {
+  display: block;
+  color: var(--muted, #65716a);
+  margin-top: 0.2rem;
+}

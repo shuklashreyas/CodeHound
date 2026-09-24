@@ -111,3 +111,18 @@ def execution_checks(checks, job):
             f"{count} review findings, {uncertain} unverified inspections. "
             "These are source-level hints, not proof of assertion strength or intent."
         )
+
+    requirements = job.artifact.get("requirement_evidence", {}).get("requirements", [])
+    if requirements:
+        contradicted = sum(item["candidate"]["status"] == "contradicted" for item in requirements)
+        supported = sum(
+            item["candidate"]["status"] == "supported_by_checks" for item in requirements
+        )
+        check = by_name["requirement_adherence"]
+        check.status = "fail" if contradicted else "unknown"
+        check.explanation = (
+            f"Operator-defined requirements: {supported} supported by mapped examples, "
+            f"{contradicted} contradicted, "
+            f"{len(requirements) - supported - contradicted} unverified. "
+            "Coverage of the submitted issue has not been established."
+        )
