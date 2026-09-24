@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from codehound.execution.docker import DockerRunner
+from codehound.execution.results import compare_tests, summarize_comparisons
 from codehound.repositories.checkout import GitWorkspace
 from codehound.repositories.urls import parse_pull_url
 
@@ -42,17 +43,7 @@ def suite_digest(directory: Path):
 
 def comparison(baseline, candidate):
     """Describe observed test transitions without claiming full task correctness."""
-    if any(
-        result.status != "completed" or result.exit_code not in (0, 1)
-        for result in (baseline, candidate)
-    ):
-        return "inconclusive"
-    return {
-        (0, 0): "both_pass",
-        (0, 1): "regression_detected",
-        (1, 0): "candidate_improves",
-        (1, 1): "both_fail",
-    }[baseline.exit_code, candidate.exit_code]
+    return compare_tests(baseline, candidate)["verdict"]
 
 
 async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWorkspace):
@@ -82,19 +73,21 @@ async def verify_snapshot(snapshot, suites, runner, *, workspace_factory=GitWork
                 "baseline": baseline.to_dict(),
                 "candidate": candidate.to_dict(),
                 "comparison": comparison(baseline, candidate),
+                "test_comparison": compare_tests(baseline, candidate),
             }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "pr_url": reference.url,
         "base_sha": snapshot["base_sha"],
         "head_sha": snapshot["head_sha"],
         "diff_sha256": snapshot["diff_sha256"],
         "suites": results,
+        "assessment": summarize_comparisons(results),
         "confidence": None,
         "limitations": [
             "Only the supplied operator-owned Python test suites were executed.",
             "Passing tests do not establish full requirement coverage or patch integrity.",
-            "Tests share a Python process with candidate code; exit codes can be manipulated.",
+            "Tests share a Python process with candidate code; reports can be manipulated.",
             "Repository dependencies must already be present in the trusted image.",
         ],
     }

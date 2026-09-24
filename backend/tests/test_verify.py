@@ -13,21 +13,37 @@ from codehound.repositories.urls import parse_pull_url
 RESULT = ExecutionResult("completed", 0, "", "", 0.1, "sha256:" + "a" * 64, False, False, 30)
 
 
+def run_result(exit_code):
+    report = {
+        "schema_version": 1,
+        "exit_code": exit_code,
+        "collected": ["test_case.py::test_example"],
+        "tests": [
+            {
+                "nodeid": "test_case.py::test_example",
+                "outcome": "passed" if exit_code == 0 else "failed",
+                "duration_seconds": 0.1,
+                "message": "",
+            }
+        ],
+        "collection_errors": [],
+    }
+    return replace(RESULT, exit_code=exit_code, test_report=report)
+
+
 @pytest.mark.parametrize(
     "first,second,expected",
     [
-        (0, 0, "both_pass"),
+        (0, 0, "no_behavior_change_observed"),
         (0, 1, "regression_detected"),
         (1, 0, "candidate_improves"),
-        (1, 1, "both_fail"),
+        (1, 1, "incomplete"),
         (0, 5, "inconclusive"),
         (2, 0, "inconclusive"),
     ],
 )
 def test_test_transitions(first, second, expected):
-    assert (
-        comparison(replace(RESULT, exit_code=first), replace(RESULT, exit_code=second)) == expected
-    )
+    assert comparison(run_result(first), run_result(second)) == expected
 
 
 def test_timeout_cannot_count_as_improvement():
@@ -67,7 +83,7 @@ def test_pinned_comparison_uses_same_tests_and_cleans_up(github_bundle, tmp_path
     class Runner:
         async def run(self, code, tests):
             calls.append((code, tests))
-            return replace(RESULT, exit_code=1 if str(code) == "baseline" else 0)
+            return run_result(1 if str(code) == "baseline" else 0)
 
     result = asyncio.run(
         verify_snapshot(snapshot, {"visible": tmp_path}, Runner(), workspace_factory=Workspace)

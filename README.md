@@ -162,7 +162,7 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.demo \
 ```
 
 The report records stdout, stderr, exit codes, duration, image identity, and limits
-for the original code and both candidate fixes. The deliberately overfit patch
+for the original code and three candidate fixes. The deliberately overfit patch
 passes the issue's example but fails varied cases. This is a public synthetic
 fixture, **not** a hidden benchmark or a detection-rate claim.
 
@@ -191,9 +191,12 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.verify \
 ```
 
 `--hidden-tests` is optional. The command refuses to overwrite evidence files.
-Comparisons are `both_pass`, `candidate_improves`, `both_fail`, or
-`regression_detected`. Timeouts, infrastructure errors, collection errors, and no
-collected tests are `inconclusive`. A test improvement is not a correctness verdict.
+Comparisons match individual test IDs and report improvements, regressions,
+unresolved failures, missing tests, and unverified checks. Verdicts are
+`candidate_improves`, `regression_detected`, `incomplete`,
+`no_behavior_change_observed`, or `inconclusive`. Timeouts, infrastructure errors,
+and absent reports cannot count as improvements. Skips and expected failures are
+not treated as passes. See [comparison semantics](docs/comparison-engine.md). A test improvement is not a correctness verdict.
 This command is operator-controlled and is not exposed through the web API.
 
 ## Development checks
