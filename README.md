@@ -239,3 +239,5 @@ test profiles and gather human-reviewed real agent patches. The
 public synthetic corpus does not establish real-world detection performance.
 
 Worker containers and checkouts use claim-aware crash recovery. See [worker recovery](docs/worker-recovery.md) for ownership rules and the dry-run cleanup command.
+
+Profiles can map explicit requirements to execution cases. The dashboard shows before/after [requirement evidence](docs/requirement-evidence.md), including requirements with no mapped checks, without claiming full issue coverage.

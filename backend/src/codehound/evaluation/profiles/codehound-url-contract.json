@@ -112,5 +112,57 @@
         }
       }
     ]
-  }
+  },
+  "requirements": [
+    {
+      "id": "parse-public-pr",
+      "description": "Parse public HTTPS GitHub PR URLs, including whitespace and a trailing slash.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "public-url"
+        },
+        {
+          "suite": "visible",
+          "case_id": "trailing-slash"
+        }
+      ]
+    },
+    {
+      "id": "reject-unsafe-url",
+      "description": "Reject deceptive hosts, embedded credentials, non-HTTPS URLs, and query strings.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "wrong-host"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "credentials"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "non-https"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "query"
+        }
+      ]
+    },
+    {
+      "id": "reject-invalid-pr",
+      "description": "Reject a nonpositive PR number and parent-directory repository name.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "zero-number"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "parent-repo"
+        }
+      ]
+    }
+  ]
 }

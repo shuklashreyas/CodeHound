@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./github";
+import { Requirements } from "./requirements";
+import type { RequirementEvidence } from "./requirements";
 import { IntegrityEvidence } from "./integrity";
 import type { IntegrityResult } from "./integrity";
 
@@ -46,6 +48,7 @@ type Job = {
     suites: Record<string, Suite>;
     limitations: string[];
     test_integrity?: IntegrityResult | null;
+    requirement_evidence?: RequirementEvidence;
   } | null;
 };
 type Report = {
@@ -561,6 +564,11 @@ export function Verification({
                         ([name, suite]) => (
                           <SuiteEvidence key={name} name={name} suite={suite} />
                         ),
+                      )}
+                      {job.artifact.requirement_evidence && (
+                        <Requirements
+                          result={job.artifact.requirement_evidence}
+                        />
                       )}
                       {job.artifact.test_integrity && (
                         <IntegrityEvidence
