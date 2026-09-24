@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -87,3 +88,11 @@ class WorkerHeartbeat(Base):
     __tablename__ = "worker_heartbeats"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ExecutionNamespace(Base):
+    __tablename__ = "execution_namespace"
+    __table_args__ = (CheckConstraint("id = 1", name="single_execution_namespace"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    value: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)

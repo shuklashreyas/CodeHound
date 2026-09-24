@@ -1,13 +1,16 @@
 """Disposable Git checkouts of pinned public revisions, without executing repository code."""
 
 import asyncio
+import json
 import os
 import re
 import signal
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
+from codehound.core.execution_scope import current_scope, workspace_root
 from codehound.repositories.urls import parse_pull_url
 
 
@@ -170,9 +173,26 @@ class GitWorkspace:
             await asyncio.gather(finished, *readers, return_exceptions=True)
 
     async def __aenter__(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="codehound-checkout-", dir=self.parent)
+        scope = current_scope.get()
+        parent = self.parent
+        prefix = "codehound-checkout-"
+        if scope:
+            parent = (parent or workspace_root()) / scope.namespace
+            parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if parent.is_symlink():
+                raise CheckoutFailure("Managed workspace parent must not be a symlink.")
+            prefix = f"run-{scope.job_id}-{scope.claim_token}-"
+        self.temporary = tempfile.TemporaryDirectory(prefix=prefix, dir=parent)
         self.root = Path(self.temporary.name)
         try:
+            if scope:
+                marker = {
+                    "namespace": scope.namespace,
+                    "job_id": scope.job_id,
+                    "claim_token": scope.claim_token,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+                (self.root / ".codehound-workspace.json").write_text(json.dumps(marker))
             async with asyncio.timeout(self.timeout):
                 await self.git("init", "--bare", "objects.git")
                 await self.git(
