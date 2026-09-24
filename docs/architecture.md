@@ -54,8 +54,9 @@ can interrupt cleanup; production workers also need orphan-container reconciliat
 
 Python under test still shares a process with pytest. It can attempt to manipulate
 the test framework or terminate the process. Exit codes and logs are evidence, not
-proof against adversarial code. External test protocols and stronger sandboxing
-remain necessary before claiming adversarial robustness.
+proof against adversarial code. The optional JSON function evaluator keeps assertions and expected answers
+outside the candidate container. Its narrower contract and remaining limits are
+documented in `independent-evaluator.md`; arbitrary pytest does not gain that boundary.
 
 ## Authentication
 

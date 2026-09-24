@@ -19,6 +19,8 @@ execution, hidden tests, patch integrity checks, and repository context.
   Versioned Alembic migrations run at API startup.
 - **Restricted Python execution:** a standalone Docker runner with CPU, memory,
   process, time, and output limits, plus independent read-only tests.
+- **Independent JSON evaluator:** expected answers and assertions stay outside candidate
+  containers; supports operator-defined Python function profiles.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
   fix passes visible tests but fails independent cases.
 
@@ -198,6 +200,10 @@ unresolved failures, missing tests, and unverified checks. Verdicts are
 and absent reports cannot count as improvements. Skips and expected failures are
 not treated as passes. See [comparison semantics](docs/comparison-engine.md). A test improvement is not a correctness verdict.
 This command is operator-controlled and is not exposed through the web API.
+
+For stronger assertion isolation, use [independent JSON evaluation](docs/independent-evaluator.md)
+with `--mode independent` and operator-owned JSON profiles. This mode judges
+observed values outside candidate containers and does not mount expected answers.
 
 ## Development checks
 

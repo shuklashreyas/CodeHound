@@ -87,9 +87,10 @@ def compare_tests(baseline, candidate):
         "reasons": [],
         "counts": {},
     }
-    if (baseline.image_id, baseline.evaluator_sha256) != (
+    if (baseline.image_id, baseline.evaluator_sha256, baseline.evidence_source) != (
         candidate.image_id,
         candidate.evaluator_sha256,
+        candidate.evidence_source,
     ):
         result["reasons"].append("Execution image or evaluator changed between revisions.")
     for label, run in (("baseline", baseline), ("candidate", candidate)):
