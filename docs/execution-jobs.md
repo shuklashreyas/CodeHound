@@ -28,19 +28,24 @@ Docker socket. Do not run untrusted workloads on a shared production API host.
 
 ## Profiles
 
-The bundled profiles are public dogfooding fixtures, not secret benchmark tests or
-full coverage of a CodeHound PR:
+The bundled profiles are public operator-owned fixtures, not secret benchmark tests
+or complete coverage of the submitted issue:
 
 | Profile | Coverage | Visible / independent cases |
 | --- | --- | --- |
 | `codehound-url-contract` | Public PR URL parsing and unsafe URL rejection | 2 / 6 |
 | `codehound-verdict-contract` | Verdict aggregation, regression priority, uncertainty, and improvement signals | 3 / 9 |
+| `packaging-name-validation` | Validated name newline rejection and optional-validation behavior | 3 / 13 |
+| `boltons-bytes-boundaries` | Byte formatting at unit thresholds | 4 / 9 |
+| `boltons-singular-double-s` | Singularization of words ending in double s | 3 / 12 |
 
 The verdict profile requires `codehound.execution.results.summarize_comparisons`
 in both revisions. For CodeHound PR #1, that module was newly added, so the baseline
 cannot satisfy the adapter contract and the comparison remains inconclusive. Use
 later PRs to check its existing behavior. Missing targets are never silently treated
-as passing checks. Other repositories have no profile until an operator provides one.
+as passing checks. Repositories without a matching bundled or operator-provided
+profile cannot run. See the [packaging reproduction](real-repository.md) and
+[Boltons tasks](real-tasks.md) for the pinned upstream examples.
 
 Set `CODEHOUND_PROFILE_DIR` to replace the bundled profiles with JSON files you
 control. Each file contains `id`, `label`, `repository`, `coverage`, a `visible`

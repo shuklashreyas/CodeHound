@@ -2,8 +2,9 @@
 
 Start the API, frontend, and separate worker as described in
 [execution-jobs.md](execution-jobs.md). Configure the trusted image ID before
-starting the API. Sign in with GitHub; API restarts currently require signing in
-again because sessions are in memory.
+starting the API. Sign in with GitHub. With default in-memory sessions, API restarts
+require signing in again; optional [shared database sessions](shared-sessions.md)
+preserve unexpired sessions across restarts.
 
 1. Choose **New verification**, enter a public GitHub PR URL and task description,
    and create a saved draft.

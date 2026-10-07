@@ -258,7 +258,10 @@ The default tests isolate storage in temporary SQLite databases. Set
 `CODEHOUND_TEST_POSTGRES_URL` to a **dedicated test database** to enable PostgreSQL
 integration checks. Set `CODEHOUND_TEST_IMAGE_ID` to the trusted Docker image ID to
 enable actual container tests. CI runs PostgreSQL and Docker integration jobs as
-well as frontend tests and the production build.
+well as frontend tests and the production build. The Docker job runs the complete
+backend suite so new container tests are included automatically. Live public
+repository checks remain explicitly enabled release checks; see the
+[MVP release checklist](docs/release.md).
 
 See [architecture and remaining boundaries](docs/architecture.md) and the
 [dashboard walkthrough](docs/dashboard.md). Next: broaden independently retained
