@@ -1,16 +1,20 @@
+import asyncio
 import base64
 import json
 
 import pytest
+from test_corpus import make_corpus
 
 from codehound.benchmark.task_experiment import (
     TaskProfile,
     compare_observations,
     load_profile,
     observation,
+    run_experiment,
     same_json,
 )
 from codehound.execution.docker import ExecutionResult
+from codehound.repositories.checkout import Checkouts
 
 
 def observed(values):
@@ -89,3 +93,87 @@ def test_duplicate_profile_json_keys_are_rejected(tmp_path):
     path.write_text('{"schema_version":1,"schema_version":1}')
     with pytest.raises(ValueError):
         load_profile(path)
+
+
+@pytest.mark.parametrize("mutate_profile", [False, True])
+def test_full_materialization_and_frozen_input_guard(tmp_path, mutate_profile):
+    corpus, document = make_corpus(tmp_path)
+    adapter = tmp_path / "observe.py"
+    adapter.write_text("# Trusted fixture; never executed by this data-only fake runner.\n")
+    case = document["cases"][0]
+    mapping = tmp_path / "mapping.json"
+    payload = {
+        "schema_version": 1,
+        "name": "Unit experiment",
+        "purpose": "development_pilot",
+        "adapter": str(adapter),
+        "tasks": [
+            {
+                "task_id": case["task_id"],
+                "repository": case["repository"],
+                "base_commit": case["base_sha"],
+                "issue_sha256": case["issue_sha256"],
+                "supported": True,
+                "unsupported_reason": None,
+                "expected": {"behavior": "good"},
+                "authorship": {
+                    "scope": "development",
+                    "timing": "pre_patch",
+                    "basis": "Deterministic unit fixture; not research evidence.",
+                },
+            }
+        ],
+    }
+    mapping.write_text(json.dumps(payload))
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    (baseline / "x.py").write_text("bad\n")
+
+    class Workspace:
+        def __init__(self, *args):
+            pass
+
+        async def __aenter__(self):
+            return Checkouts(baseline, baseline, case["base_sha"], case["base_sha"])
+
+        async def __aexit__(self, *args):
+            return False
+
+    class DataRunner:
+        async def run_container(self, workspace, mounts, command):
+            value = (workspace / "x.py").read_text().strip()
+            raw = json.dumps({"kind": "returned", "value": {"behavior": value}}).encode()
+            token = command[-2]
+            if mutate_profile:
+                payload["name"] = "changed while running"
+                mapping.write_text(json.dumps(payload))
+            return ExecutionResult(
+                "completed",
+                0,
+                f"CODEHOUND_CALL_V1:{token}:" + base64.b64encode(raw).decode(),
+                "",
+                0.01,
+                "sha256:" + "1" * 64,
+                False,
+                False,
+                30,
+            )
+
+    record = asyncio.run(
+        run_experiment(
+            corpus,
+            mapping,
+            adapter,
+            "sha256:" + "1" * 64,
+            runner=DataRunner(),
+            workspace_factory=Workspace,
+        )
+    )
+    row = record["rows"][0]
+    if mutate_profile:
+        assert record["status"] == "invalidated"
+        assert row["decisions"]["task_behavior"] == "abstain"
+    else:
+        assert record["status"] == "completed"
+        assert row["decisions"]["task_behavior"] == "accept"
+        assert row["comparison"]["improvements"] == ["behavior"]

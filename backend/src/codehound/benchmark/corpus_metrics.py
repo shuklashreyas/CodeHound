@@ -259,8 +259,91 @@ def validate_evidence(record, corpus_sha, prepared, mapping, mapping_sha):
     return verified
 
 
+def ratio(numerator, denominator):
+    return numerator / denominator if denominator else None
+
+
+def accuracy_eligible(row):
+    """Use only agreed retained human labels; unknown/conflicting labels stay excluded."""
+    return (
+        row.get("accuracy_eligible") is True
+        and row.get("label") in {"valid", "invalid"}
+        and row.get("review_status", "agreed") == "agreed"
+    )
+
+
+def evidence_explanation(row, evaluator):
+    """Summarize observed evaluator evidence without inventing a correctness judgment."""
+    if evaluator == "independent":
+        assessment = row.get("assessment") or {}
+        return {
+            key: assessment[key] for key in ("verdict", "reasons", "counts") if key in assessment
+        }
+    if evaluator == "static_only":
+        artifact = row.get("static_analysis") or {}
+        return {
+            key: artifact[key] for key in ("status", "counts", "limitations") if key in artifact
+        }
+    if evaluator == "repository_tests_only":
+        artifact = row.get("repository_tests") or {}
+        return {
+            key: artifact[key]
+            for key in ("status", "test_comparison", "limitations")
+            if key in artifact
+        }
+    if evaluator == "visible_only":
+        artifact = (row.get("suites") or {}).get("visible", {})
+        return (
+            {"test_comparison": artifact["test_comparison"]}
+            if "test_comparison" in artifact
+            else {}
+        )
+    if evaluator == "task_behavior":
+        return {
+            key: row[key]
+            for key in (
+                "comparison",
+                "improvements",
+                "regressions",
+                "unresolved",
+                "profile_authorship",
+            )
+            if key in row
+        }
+    # Additional adapters may supply their own observed evidence without becoming labels.
+    evidence = (row.get("evaluator_evidence") or {}).get(evaluator)
+    return evidence if isinstance(evidence, dict) else {}
+
+
+def analyzed_case(row, evaluator):
+    reviews = row.get("reviews") or []
+    return {
+        "case_id": row.get("case_id"),
+        "case_identity_sha256": row.get("case_identity_sha256"),
+        "decision": row["decisions"][evaluator],
+        "human_label": row["label"],
+        "failure_categories": sorted(
+            {category for review in reviews for category in review.get("failure_categories", [])}
+        ),
+        "human_review_explanations": [
+            {"reviewer": review.get("reviewer"), "rationale": review.get("rationale")}
+            for review in reviews
+        ],
+        "evaluator_evidence": evidence_explanation(row, evaluator),
+        "explanation": (
+            "The evaluator rejected a patch with an agreed valid human review."
+            if row["label"] == "valid"
+            else "The evaluator accepted a patch with an agreed invalid human review."
+        ),
+    }
+
+
 def score(rows, evaluator):
-    eligible = [row for row in rows if row["accuracy_eligible"]]
+    """Accuracy is conditional on human review AND a decision; coverage uses all rows."""
+    for row in rows:
+        if row["decisions"].get(evaluator) not in {"accept", "reject", "abstain"}:
+            raise ValueError("Evaluator decisions must be accept, reject or abstain.")
+    eligible = [row for row in rows if accuracy_eligible(row)]
     confusion = {
         label: {decision: 0 for decision in ("accept", "reject", "abstain")}
         for label in ("valid", "invalid")
@@ -269,28 +352,68 @@ def score(rows, evaluator):
         confusion[row["label"]][row["decisions"][evaluator]] += 1
     valid = sum(confusion["valid"].values())
     invalid = sum(confusion["invalid"].values())
-    abstentions = confusion["valid"]["abstain"] + confusion["invalid"]["abstain"]
+    tp, fp = confusion["invalid"]["reject"], confusion["valid"]["reject"]
+    fn, tn = confusion["invalid"]["accept"], confusion["valid"]["accept"]
+    reviewed_abstentions = confusion["valid"]["abstain"] + confusion["invalid"]["abstain"]
+    all_abstentions = sum(row["decisions"][evaluator] == "abstain" for row in rows)
     return {
+        "metric_definition_version": 2,
+        "positive_class": "invalid_patch",
+        "accuracy_population": "agreed_human_review_and_non_abstaining_evaluator",
         "total_cases": len(rows),
         "reviewed_cases": len(eligible),
+        "decided_reviewed_cases": tp + fp + fn + tn,
+        "all_case_decided_cases": len(rows) - all_abstentions,
         "excluded_unknown_or_ambiguous": len(rows) - len(eligible),
         "valid_denominator": valid,
         "invalid_denominator": invalid,
         "confusion": confusion,
-        "bad_patches_caught": confusion["invalid"]["reject"],
-        "bad_patches_missed": confusion["invalid"]["accept"],
+        "decided_confusion": {"TP": tp, "FP": fp, "FN": fn, "TN": tn},
+        "precision": ratio(tp, tp + fp),
+        "recall": ratio(tp, tp + fn),
+        "false_positive_rate": ratio(fp, fp + tn),
+        "false_negative_rate": ratio(fn, fn + tp),
+        "bad_patches_caught": tp,
+        "bad_patches_missed": fn,
+        "false_positives": fp,
         "invalid_abstentions": confusion["invalid"]["abstain"],
-        "false_positives": confusion["valid"]["reject"],
         "valid_abstentions": confusion["valid"]["abstain"],
-        "bad_patch_detection_rate": confusion["invalid"]["reject"] / invalid if invalid else None,
-        "false_positive_rate": confusion["valid"]["reject"] / valid if valid else None,
-        "reviewed_decision_coverage": (len(eligible) - abstentions) / len(eligible)
-        if eligible
-        else None,
-        "all_case_decision_coverage": sum(row["decisions"][evaluator] != "abstain" for row in rows)
-        / len(rows)
-        if rows
-        else None,
+        "all_case_abstentions": all_abstentions,
+        "reviewed_abstentions": reviewed_abstentions,
+        "all_case_abstention_rate": ratio(all_abstentions, len(rows)),
+        "reviewed_abstention_rate": ratio(reviewed_abstentions, len(eligible)),
+        "reviewed_decision_coverage": ratio(len(eligible) - reviewed_abstentions, len(eligible)),
+        "all_case_decision_coverage": ratio(len(rows) - all_abstentions, len(rows)),
+        "population_yield": {
+            "bad_patch_detection_rate": ratio(tp, invalid),
+            "false_positive_fraction": ratio(fp, valid),
+            "denominator_includes_reviewed_abstentions": True,
+        },
+        # Compatibility alias: this is population yield, not conditional recall.
+        "bad_patch_detection_rate": ratio(tp, invalid),
+        "case_analyses": {
+            "false_positives": [
+                analyzed_case(row, evaluator)
+                for row in eligible
+                if row["label"] == "valid" and row["decisions"][evaluator] == "reject"
+            ],
+            "false_negatives": [
+                analyzed_case(row, evaluator)
+                for row in eligible
+                if row["label"] == "invalid" and row["decisions"][evaluator] == "accept"
+            ],
+        },
+        "unreviewed_review_candidates": [
+            {
+                "case_id": row.get("case_id"),
+                "case_identity_sha256": row.get("case_identity_sha256"),
+                "decision": row["decisions"][evaluator],
+                "review_status": row.get("review_status", "unreviewed"),
+                "evaluator_evidence": evidence_explanation(row, evaluator),
+            }
+            for row in rows
+            if not accuracy_eligible(row) and row["decisions"][evaluator] != "abstain"
+        ],
     }
 
 
