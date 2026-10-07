@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "name": "Django and SymPy public task API development probes",
+  "adapter": "benchmarks/probes/scientific_task_adapter.py",
+  "purpose": "development_pilot",
+  "tasks": [
+    {
+      "task_id": "django__django-10097",
+      "repository": "django/django",
+      "base_commit": "b9cf764be62e77b4777b3a75ec256f6209a57671",
+      "issue_sha256": "2288319e7e72693551b8454b5c63f165f23dfb32bc6579ad03602d3cd311bdaa",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "slash_username": false,
+        "slash_password": false,
+        "colon_password": false,
+        "at_username": false,
+        "query_does_not_rescue_invalid_url": false,
+        "valid_credentials": true,
+        "encoded_credentials": true,
+        "ordinary_control": true
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Validates issue-specified unencoded credential delimiters plus legitimate encoded credentials; no general URL RFC conformance claim."
+      ]
+    },
+    {
+      "task_id": "sympy__sympy-11618",
+      "repository": "sympy/sympy",
+      "base_commit": "360290c4c401e386db60723ddb0109ed499c9f6e",
+      "issue_sha256": "7eec6e997311bf1014a07659710714c0a891fd0e5b9d58dadb31a83b23746330",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "mixed_dimensions": 2.2360679775,
+        "mixed_dimensions_reverse": 2.2360679775,
+        "vertical_axis": 3,
+        "two_dimensions_control": 5,
+        "three_dimensions_control": 13
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Numeric distances rounded to ten decimal places; selected dimensional promotion cases and same-dimension controls only."
+      ]
+    },
+    {
+      "task_id": "django__django-10554",
+      "repository": "django/django",
+      "base_commit": "14d026cccb144c6877294ba4cd4e03ebf0842498",
+      "issue_sha256": "2f72fa6137f1d53983cff629a05e06c42a2ad477ea4557746c4688cbd6aeb724",
+      "supported": false,
+      "unsupported_reason": "The reported PostgreSQL ordered-union cloning error is not reproduced by the available SQLite baseline, including prior repr evaluation; no trusted PostgreSQL environment is configured.",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "A baseline-only SQLite public ORM experiment preserved clone isolation and ordered results, so it cannot substantiate this issue reproduction.",
+        "Adapter retains the exploratory SQLite observation, but this task must abstain until a PostgreSQL-backed probe is independently authored."
+      ]
+    },
+    {
+      "task_id": "sympy__sympy-12096",
+      "repository": "sympy/sympy",
+      "base_commit": "d7c3045115693e887bcd03599b7ca4650ac5f2cb",
+      "issue_sha256": "a633664578299e2b65570564c49bb08d3e5bfb7fe7d230c64d1d7525d2fb9718",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "direct_square": 4,
+        "direct_double": 4,
+        "square_of_double": 16,
+        "double_of_square": 8,
+        "three_levels": 72
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks two compositions and one deeper nesting using the issue-described numeric implemented-function APIs; symbolic and arbitrary complex functions remain unverified."
+      ]
+    },
+    {
+      "task_id": "django__django-10880",
+      "repository": "django/django",
+      "base_commit": "838e432e3e5519c5383d12018e6c78f8ec7833c1",
+      "issue_sha256": "d554ba8ef84e2e4dc22c291d413e4cb58070d5d730dae3aca383a4cdb77c20b2",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "conditional_distinct_count": 2,
+        "distinct_control": 3
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Executes a conditional distinct aggregate with SQLite; checks the database-agnostic missing SQL separator and retains a distinct-count control."
+      ]
+    },
+    {
+      "task_id": "sympy__sympy-12419",
+      "repository": "sympy/sympy",
+      "base_commit": "479939f8c65c8c2908bbedc959549a257a7c0b0b",
+      "issue_sha256": "48b311ac971aa2fe020b8dd89cd7d2aac3278d4b668921c6b07a29cb914ed4a5",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "identity_total_symbolic": "n",
+        "orthogonal_total_symbolic": "n",
+        "diagonal_control": "n",
+        "finite_identity_total": "3"
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks symbolic Identity and orthogonal-refined Identity sums plus diagonal/finite controls; expression strings are observed, not proof of general summation correctness."
+      ]
+    },
+    {
+      "task_id": "django__django-10914",
+      "repository": "django/django",
+      "base_commit": "e7fd69d051eaa67cb17f172a39b57253e9cb831a",
+      "issue_sha256": "ba101c6d80094fe56bc64d74dcb7efe033a6e0d43dd77e8f00e65806fdbcdb8b",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "default_permission_setting": 420,
+        "memory_upload_permissions": 420,
+        "temporary_upload_permissions": 420
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks default setting and actual memory/temporary upload file modes under the container filesystem; does not characterize every operating system or configured storage backend."
+      ]
+    },
+    {
+      "task_id": "sympy__sympy-12481",
+      "repository": "sympy/sympy",
+      "base_commit": "c807dfe7569692cad24f02a08477b70c1679a4dd",
+      "issue_sha256": "5be18855c5c93b9af1ad839da500cb74d1bb38ff8e1f93340baedcd8df0249cc",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "repeated_transposition": [
+          0,
+          1
+        ],
+        "overlap_left_to_right": [
+          2,
+          0,
+          1
+        ],
+        "longer_cycle_overlap": [
+          2,
+          1,
+          0
+        ],
+        "padded_identity": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "disjoint_control": [
+          1,
+          0,
+          3,
+          2
+        ]
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks overlapping and repeated cycles applied left-to-right with explicit array-form observations; arbitrary permutation properties remain unverified."
+      ]
+    },
+    {
+      "task_id": "django__django-10973",
+      "repository": "django/django",
+      "base_commit": "ddb293685235fd09e932805771ae97f72e817181",
+      "issue_sha256": "bde1c4529fef5d030d1bd73a02e45bdbf9535a3c351aa9a43dba5c8249800271",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "password_environment": {
+          "calls": [
+            {
+              "api": "run",
+              "argv": [
+                "psql",
+                "-U",
+                "probe_user",
+                "-h",
+                "localhost",
+                "-p",
+                "5432",
+                "probe_db"
+              ],
+              "password": "probe-pass:word",
+              "parent_password_during_call": "existing-probe-value",
+              "pgpassfile_set": false
+            }
+          ],
+          "parent_password_after": "existing-probe-value"
+        },
+        "unicode_password_environment": {
+          "calls": [
+            {
+              "api": "run",
+              "argv": [
+                "psql",
+                "-U",
+                "probe_user",
+                "-h",
+                "localhost",
+                "-p",
+                "5432",
+                "probe_db"
+              ],
+              "password": "päss\\word",
+              "parent_password_during_call": "existing-probe-value",
+              "pgpassfile_set": false
+            }
+          ],
+          "parent_password_after": "existing-probe-value"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Trusted subprocess spy records psql argv/environment and API selection; no PostgreSQL server or external psql process is started.",
+        "Only password transport, isolation, and argument preservation are checked; interactive signal and error behavior remain unverified."
+      ]
+    },
+    {
+      "task_id": "sympy__sympy-12489",
+      "repository": "sympy/sympy",
+      "base_commit": "aa9780761ad8c3c0f68beeef3a0ce5caac9e100b",
+      "issue_sha256": "33f4a1134633597866883bbd4ac04b3642fda8ae680822b1c44d5a5e82b8ce28",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "empty": {
+          "class": "ProbePermutation",
+          "array": []
+        },
+        "integer_identity": {
+          "class": "ProbePermutation",
+          "array": [
+            0,
+            1,
+            2
+          ]
+        },
+        "cycle_arguments": {
+          "class": "ProbePermutation",
+          "array": [
+            1,
+            2,
+            0
+          ]
+        },
+        "cycle_object": {
+          "class": "ProbePermutation",
+          "array": [
+            1,
+            0
+          ]
+        },
+        "array_control": {
+          "class": "ProbePermutation",
+          "array": [
+            1,
+            0
+          ]
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks five constructor paths for subclass preservation and arrays; every inherited permutation operation is not covered."
+      ]
+    },
+    {
+      "task_id": "django__django-10999",
+      "repository": "django/django",
+      "base_commit": "36300ef336e3f130a0dadc1143163ff3d23dc843",
+      "issue_sha256": "efbac10cda6c1ef780205a8d9fc176b5489d1da8f76d9cbd366ef303052fd8d3",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "all_negative": -3661,
+        "negative_minutes": 3483,
+        "negative_hours_and_seconds": -3483,
+        "negative_fraction": 7015.5,
+        "days_and_negative_components": 169077,
+        "positive_control": 3723,
+        "invalid_control": null
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline public API source before viewing or executing any agent patch. Numeric/algebraic expectations and compatibility controls supplied by the operator."
+      },
+      "notes": [
+        "Checks mixed signed hour/minute/second components, fraction sign, days, positive input, and invalid input."
+      ]
+    }
+  ]
+}
