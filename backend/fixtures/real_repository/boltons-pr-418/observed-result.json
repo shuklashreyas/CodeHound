@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-07T02:44:00.616345+00:00",
+  "base_sha": "979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe",
+  "head_sha": "168ef1575e2ccfb308d7892548c41d24fd251b26",
+  "diff_sha256": "f8c880cd770b029696f9b48552e28e117de3146b9a7f0cca8ed248b2fa5bbf5f",
+  "image_id": "sha256:199083f1031badac261212e56122476a98696367cbf30b5bb1867e5ffbbb3f4a",
+  "profile_id": "boltons-singular-double-s",
+  "assessment": {
+    "verdict": "candidate_improves",
+    "signals": [],
+    "confidence": null
+  },
+  "independent_suites": {
+    "visible": {
+      "counts": {
+        "improvements": 1,
+        "regressions": 0,
+        "unresolved": 0,
+        "unchanged_passes": 2,
+        "unverified": 0,
+        "missing_tests": 0,
+        "added_tests": 0
+      },
+      "baseline": {
+        "failed": 1,
+        "passed": 2
+      },
+      "candidate": {
+        "passed": 3
+      },
+      "test_suite_sha256": "940bc2b4be4d4b6cc1776531a85016094bf4fbb5e780f15b4dd81c6accadc104",
+      "evaluator_sha256": "2d7d8ff518a41a2fad217f45601808857a18041aa8253ffb09cf6cba13787f41"
+    },
+    "hidden": {
+      "counts": {
+        "improvements": 7,
+        "regressions": 0,
+        "unresolved": 0,
+        "unchanged_passes": 5,
+        "unverified": 0,
+        "missing_tests": 0,
+        "added_tests": 0
+      },
+      "baseline": {
+        "failed": 7,
+        "passed": 5
+      },
+      "candidate": {
+        "passed": 12
+      },
+      "test_suite_sha256": "3a2201499750b6711c114c7efbea24d92cd9fa3ff56fb5283733edc76916ef70",
+      "evaluator_sha256": "aa5e1e9ab9b68bc9a787ed176a29f904522106bed61a310975bb211d86ad3987"
+    }
+  },
+  "repository_tests": {
+    "evidence_source": "repository_controlled_in_process_pytest",
+    "counts": {
+      "improvements": 0,
+      "regressions": 0,
+      "unresolved": 0,
+      "unchanged_passes": 17,
+      "unverified": 0,
+      "missing_tests": 0,
+      "added_tests": 0
+    },
+    "provenance": {
+      "baseline_sha": "979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe",
+      "test_suite_sha256": "c0afd8e30671e3e8628e37eb39314182379586e699706bd28cd2fb0fceafba43",
+      "configuration_sha256": "22394afd6541ea08b7bc9f4a216dac6458b918423d759e36bb525202594e938e",
+      "test_paths": [
+        "tests/test_strutils.py"
+      ],
+      "source_directories": [
+        "."
+      ],
+      "target_packages": [
+        "boltons"
+      ],
+      "files": [
+        {
+          "path": "tests/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "tests/conftest.py",
+          "sha256": "91934bf3791e19404372fe5a9aeb4470c2f0bc3afb592eb2df2f6ffca1df1a2a",
+          "bytes": 800
+        },
+        {
+          "path": "tests/test_strutils.py",
+          "sha256": "699483e9e16e1929b88fc6eb6a925cc802435434f00d79c87a13f1857147739e",
+          "bytes": 11390
+        }
+      ],
+      "file_count": 3,
+      "total_bytes": 12190
+    },
+    "evaluator_sha256": "c41046ff4ac0cd1c61e9501b3640c41dd0d6db6322093deef8922962d1524299"
+  },
+  "static_analysis": {
+    "status": "completed",
+    "counts": {
+      "new": 0,
+      "resolved": 0,
+      "existing": 143
+    }
+  },
+  "limitations": [
+    "Single historical upstream reproduction. No detection rate, AI attribution or reviewed ground truth is established.",
+    "Summary derived from actual restricted-container evidence; reproduce to inspect complete per-case observations."
+  ],
+  "full_artifact_sha256": "54678e4da3a10e3e9a2c4a04135e0d77d6f714e8a33eaea99aa622568fa2e7fb",
+  "profile_sha256": "bb6038d4c7d6ea3f1563bb94e9d7808d5b052ef62308b70a06d7420aa05e1752"
+}
