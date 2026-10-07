@@ -1,7 +1,8 @@
 """Import downloaded SWE-bench predictions as an unlabeled development pilot.
 
-This module is offline: it never downloads, applies patches, runs setup commands,
-or copies gold patches, test patches, resolved IDs, or upstream test outcomes.
+This module is offline: it never downloads, applies patches, or runs setup commands.
+Case payloads exclude gold patches, test patches, resolved IDs, and upstream test
+outcomes. Optional original attribution files are retained separately as sources.
 """
 
 import argparse
@@ -157,29 +158,33 @@ def import_predictions(
         issue_bytes, patch_bytes = issue.encode("utf-8"), patch.encode("utf-8")
         if max(len(issue_bytes), len(patch_bytes)) > MAX_ARTIFACT_BYTES:
             raise ValueError("Selected issue or patch exceeds the retained artifact limit.")
-        case = Case.model_validate({
-            "id": identifier,
-            "task_id": identifier,
-            "family": task["repo"],
-            "split": "development",
-            "repository": task["repo"],
-            "base_sha": task.get("base_commit"),
-            "issue_path": f"cases/{identifier}/issue.txt",
-            "issue_sha256": digest(issue_bytes),
-            "patch_path": f"cases/{identifier}/patch.diff",
-            "patch_sha256": digest(patch_bytes),
-            "generation": {
-                "kind": "published_agent_prediction",
-                "model": predicted_model,
-                "agent": agent,
-                "source_id": predictions_source.id,
-            },
-        })
+        case = Case.model_validate(
+            {
+                "id": identifier,
+                "task_id": identifier,
+                "family": task["repo"],
+                "split": "development",
+                "repository": task["repo"],
+                "base_sha": task.get("base_commit"),
+                "issue_path": f"cases/{identifier}/issue.txt",
+                "issue_sha256": digest(issue_bytes),
+                "patch_path": f"cases/{identifier}/patch.diff",
+                "patch_sha256": digest(patch_bytes),
+                "generation": {
+                    "kind": "published_agent_prediction",
+                    "model": predicted_model,
+                    "agent": agent,
+                    "source_id": predictions_source.id,
+                },
+            }
+        )
         cases.append(case)
         payloads.append((case, issue_bytes, patch_bytes))
     corpus = Corpus(
-        name=name, selection=SELECTION_RULE,
-        sources=[tasks_source, predictions_source, *[s for s, _ in retained_sources]], cases=cases,
+        name=name,
+        selection=SELECTION_RULE,
+        sources=[tasks_source, predictions_source, *[s for s, _ in retained_sources]],
+        cases=cases,
     )
     provenance = {
         "schema_version": 1,
@@ -225,7 +230,10 @@ def main():
     parser.add_argument("--tasks", required=True, type=Path)
     parser.add_argument("--tasks-original", type=Path)
     parser.add_argument(
-        "--additional-source", action="append", type=Path, default=[],
+        "--additional-source",
+        action="append",
+        type=Path,
+        default=[],
         help="Local JSON descriptor {source: {id,url,revision,sha256}, path: downloaded_file}.",
     )
     parser.add_argument("--output", required=True, type=Path)
@@ -238,10 +246,15 @@ def main():
         parser.add_argument(f"--{prefix}-revision", required=True)
         parser.add_argument(f"--{prefix}-sha256", required=True)
     args = parser.parse_args()
+
     def source(prefix):
-        return {"id": prefix, "url": getattr(args, prefix + "_url"),
-                "revision": getattr(args, prefix + "_revision"),
-                "sha256": getattr(args, prefix + "_sha256")}
+        return {
+            "id": prefix,
+            "url": getattr(args, prefix + "_url"),
+            "revision": getattr(args, prefix + "_revision"),
+            "sha256": getattr(args, prefix + "_sha256"),
+        }
+
     try:
         additional_sources = []
         for path in args.additional_source:
@@ -252,9 +265,15 @@ def main():
                 raise ValueError("Additional source descriptor path must be a string.")
             additional_sources.append((descriptor["source"], descriptor["path"]))
         manifest = import_predictions(
-            args.predictions, args.tasks, args.output,
-            predictions_source=source("predictions"), tasks_source=source("tasks"),
-            agent=args.agent, model=args.model, count=args.count, name=args.name,
+            args.predictions,
+            args.tasks,
+            args.output,
+            predictions_source=source("predictions"),
+            tasks_source=source("tasks"),
+            agent=args.agent,
+            model=args.model,
+            count=args.count,
+            name=args.name,
             tasks_original_path=args.tasks_original,
             additional_sources=additional_sources,
         )

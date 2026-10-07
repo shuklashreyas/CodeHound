@@ -14,23 +14,38 @@ def sha(raw):
 def write_inputs(root, *, reverse=False, outcomes=False):
     root.mkdir(parents=True)
     tasks, predictions = [], []
-    for identifier, repo in (("aa__repo-2", "aa/repo"), ("zz__repo-1", "zz/repo"),
-                             ("aa__repo-1", "aa/repo"), ("zz__repo-2", "zz/repo")):
-        tasks.append({
-            "instance_id": identifier, "repo": repo, "base_commit": "a" * 40,
-            "problem_statement": "Exact issue text\r\nwith no trailing newline",
-            "patch": "GOLD PATCH MUST NOT BE COPIED", "test_patch": "GOLD TESTS",
-            "FAIL_TO_PASS": "PRIVATE REFERENCE TEST IDS",
-        })
-        predictions.append({
-            "instance_id": identifier, "model_name_or_path": "reported-model",
-            "model_patch": "diff --git a/a.py b/a.py\n+return 1\n",
-            "resolved": outcomes, "test_results": {"passed": outcomes},
-        })
-    predictions.extend([
-        {"instance_id": "empty", "model_patch": "\n  "},
-        {"instance_id": "no-task", "model_patch": "diff unknown"},
-    ])
+    for identifier, repo in (
+        ("aa__repo-2", "aa/repo"),
+        ("zz__repo-1", "zz/repo"),
+        ("aa__repo-1", "aa/repo"),
+        ("zz__repo-2", "zz/repo"),
+    ):
+        tasks.append(
+            {
+                "instance_id": identifier,
+                "repo": repo,
+                "base_commit": "a" * 40,
+                "problem_statement": "Exact issue text\r\nwith no trailing newline",
+                "patch": "GOLD PATCH MUST NOT BE COPIED",
+                "test_patch": "GOLD TESTS",
+                "FAIL_TO_PASS": "PRIVATE REFERENCE TEST IDS",
+            }
+        )
+        predictions.append(
+            {
+                "instance_id": identifier,
+                "model_name_or_path": "reported-model",
+                "model_patch": "diff --git a/a.py b/a.py\n+return 1\n",
+                "resolved": outcomes,
+                "test_results": {"passed": outcomes},
+            }
+        )
+    predictions.extend(
+        [
+            {"instance_id": "empty", "model_patch": "\n  "},
+            {"instance_id": "no-task", "model_patch": "diff unknown"},
+        ]
+    )
     if reverse:
         predictions.reverse()
         tasks.reverse()
@@ -41,17 +56,24 @@ def write_inputs(root, *, reverse=False, outcomes=False):
         path.write_bytes(raw)
         paths[key] = path
         paths[key + "_source"] = {
-            "id": key, "url": f"https://example.org/pinned/{key}.jsonl",
-            "revision": "b" * 40, "sha256": sha(raw),
+            "id": key,
+            "url": f"https://example.org/pinned/{key}.jsonl",
+            "revision": "b" * 40,
+            "sha256": sha(raw),
         }
     return paths
 
 
 def run_import(paths, output, **options):
     return import_predictions(
-        paths["predictions"], paths["tasks"], output,
-        predictions_source=paths["predictions_source"], tasks_source=paths["tasks_source"],
-        agent="upstream-agent", count=3, **options,
+        paths["predictions"],
+        paths["tasks"],
+        output,
+        predictions_source=paths["predictions_source"],
+        tasks_source=paths["tasks_source"],
+        agent="upstream-agent",
+        count=3,
+        **options,
     )
 
 
@@ -101,8 +123,12 @@ def test_additional_attribution_source_is_checked_bound_and_retained(tmp_path):
     paths = write_inputs(tmp_path / "inputs")
     metadata = tmp_path / "metadata.yaml"
     metadata.write_bytes(b"agent: upstream-agent\nversion: 1\n")
-    source = {"id": "agent-metadata", "url": "https://example.org/pin/metadata.yaml",
-              "revision": "c" * 40, "sha256": sha(metadata.read_bytes())}
+    source = {
+        "id": "agent-metadata",
+        "url": "https://example.org/pin/metadata.yaml",
+        "revision": "c" * 40,
+        "sha256": sha(metadata.read_bytes()),
+    }
     manifest = run_import(paths, tmp_path / "out", additional_sources=[(source, metadata)])
     corpus, _, _ = prepare_corpus(manifest)
     assert len(corpus.sources) == 3
@@ -131,9 +157,13 @@ def test_insufficient_eligible_rows_and_wrong_model_fail_before_writing(tmp_path
     paths = write_inputs(tmp_path / "inputs")
     with pytest.raises(ValueError, match="Only 4 eligible"):
         import_predictions(
-            paths["predictions"], paths["tasks"], tmp_path / "out",
-            predictions_source=paths["predictions_source"], tasks_source=paths["tasks_source"],
-            agent="agent", count=5,
+            paths["predictions"],
+            paths["tasks"],
+            tmp_path / "out",
+            predictions_source=paths["predictions_source"],
+            tasks_source=paths["tasks_source"],
+            agent="agent",
+            count=5,
         )
     with pytest.raises(ValueError, match="model differs"):
         run_import(paths, tmp_path / "wrong-model", model="wrong-attribution")

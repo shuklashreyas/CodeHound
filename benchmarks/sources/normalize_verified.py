@@ -10,7 +10,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--spec", type=Path, default=Path(__file__).with_name("verified-mini-pilot.json"))
+    parser.add_argument(
+        "--spec",
+        type=Path,
+        default=Path(__file__).with_name("verified-mini-pilot.json"),
+    )
     args = parser.parse_args()
     spec = json.loads(args.spec.read_text())
     if args.output.exists():
@@ -20,9 +24,11 @@ def main():
     raw = args.input.read_bytes()
     if hashlib.sha256(raw).hexdigest() != spec["sources"]["tasks"]["sha256"]:
         parser.error("Original parquet SHA256 mismatch.")
-    from pyarrow import parquet
+    from pyarrow import BufferReader, parquet
 
-    rows = parquet.read_table(args.input, columns=spec["normalization"]["columns"]).to_pylist()
+    rows = parquet.read_table(
+        BufferReader(raw), columns=spec["normalization"]["columns"]
+    ).to_pylist()
     if len(rows) != 500:
         parser.error("Expected 500 official Verified task rows.")
     normalized = b"".join(
@@ -30,10 +36,14 @@ def main():
         for row in rows
     )
     if hashlib.sha256(normalized).hexdigest() != spec["normalization"]["output_sha256"]:
-        parser.error("Normalization SHA256 differs from the frozen pilot source specification.")
+        parser.error(
+            "Normalization SHA256 differs from the frozen pilot source specification."
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(normalized)
-    print(f"Normalized {len(rows)} tasks; SHA256 {hashlib.sha256(normalized).hexdigest()}")
+    print(
+        f"Normalized {len(rows)} tasks; SHA256 {hashlib.sha256(normalized).hexdigest()}"
+    )
 
 
 if __name__ == "__main__":
