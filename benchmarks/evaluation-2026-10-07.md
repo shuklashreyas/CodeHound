@@ -82,6 +82,22 @@ patch, but it is **excluded from the primary manifest** and does not retroactive
 replace the accepted primary result. It identifies a concrete coverage gap for
 human review; without that review it is not a labeled false negative.
 
+**Test-filename-dependent behavior — SymPy-12419.** AI review notes identified
+an explicit stack-frame filename check in the patch: summand refinement is skipped
+when a caller filename contains `test_sums_products`. The primary mathematical
+probes had accepted the patch. A separate post-hoc diagnostic executes identical
+expression source under ordinary and test-like filenames. The baseline produces
+identical observations in both contexts. The candidate simplifies the symbolic
+identity total to `n` from `ordinary_math.py`, but leaves an unevaluated
+`Sum(Piecewise(...))` from `test_sums_products.py`. Two elementary Piecewise sums
+show the same filename dependence; diagonal and finite-identity controls agree.
+
+This demonstrates filename-dependent evaluation, not unequal mathematical values:
+an unevaluated sum can still denote the same value. It is a concrete test-integrity
+concern requiring human adjudication. The diagnostic is explicitly post-patch and
+excluded from primary metrics; it does not prove the original agent passed its
+visible tests or establish a human correctness label.
+
 ## Human review and metrics
 
 Fifty neutral review packets are retained in `data/ai-patch-review-2026-10-07/`.
@@ -153,8 +169,10 @@ selecting a favorable rerun. Original payloads, notes, and execution artifacts
 remain local under ignored `data/`; redistribution rights are not established.
 Rebuilt image IDs can differ; every new run records its actual identity.
 
-The separate `pytest-marks-posthoc.json` profile and corresponding adapter can
-be run with the pytest image, but must remain outside the primary manifest.
+The separate `pytest-marks-posthoc.json` and `sympy-filename-posthoc.json` profiles
+and corresponding adapters can be run with the pytest and scientific images,
+respectively. Both must remain outside the primary manifest. Their local outputs
+are `pytest-marks-posthoc-execution.json` and `sympy-filename-posthoc-execution.json`.
 
 ## Limits and next evaluation work
 
@@ -166,7 +184,7 @@ and repository-only comparative accuracy also await compatible evidence and
 human labels. Observations share a process with candidate code and retained
 JSON is unsigned; hashes detect stale inputs, not malicious evidence forgery.
 
-The next work is human adjudication, especially the three findings above;
+The next work is human adjudication, especially the four findings above;
 reliable environments for currently abstained cases; and frozen repository-test
 baselines. After that, compare evaluators on identical labeled cohorts, publish
 coverage beside conditional accuracy, and reserve new tasks and related patch
