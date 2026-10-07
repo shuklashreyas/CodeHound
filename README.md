@@ -8,7 +8,7 @@ execution, hidden tests, patch integrity checks, and repository context.
 
 ## What works today
 
-- **GitHub sign-in:** browse public repositories and select an open PR.
+- **GitHub sign-in:** browse public repositories and select an open PR, or paste a merged PR URL.
 - **Dashboard:** all 13 verification dimensions, clearly labeled sample
   evidence, filters, changed files, requirements, and report export.
 - **Saved drafts:** signed-in submissions are stored by GitHub account and restored
@@ -154,7 +154,7 @@ Signed-in users can create drafts in the UI. The API provides:
 | `POST /api/verifications` | Save `pr_url` and `issue_text`; optional UUID `Idempotency-Key` |
 | `GET /api/verifications?limit=30&offset=0` | List the current account's records |
 | `GET /api/verifications/{id}` | Read a record and its evidence |
-| `POST /api/verifications/{id}/intake` | Capture an open public PR; retry a failed attempt |
+| `POST /api/verifications/{id}/intake` | Capture an open or merged public PR; retry a failed attempt |
 | `GET /api/verifications/{id}/export` | Download the evidence report as JSON |
 
 Writes require the session cookie and `X-CodeHound-Request: 1` from the configured

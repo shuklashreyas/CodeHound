@@ -32,6 +32,7 @@ class Pull(BaseModel):
     title: str = Field(max_length=1024)
     body: str | None = Field(default=None, max_length=100000)
     state: str
+    merged: bool = False
     base: CommitRef
     head: CommitRef
     changed_files: int = Field(ge=0)
@@ -68,6 +69,7 @@ def fingerprint(pull: Pull):
         pull.additions,
         pull.deletions,
         pull.state,
+        pull.merged,
         pull.title,
         pull.body,
         pull.base.repo,
@@ -146,9 +148,11 @@ async def collect_snapshot(reference: PullReference, github: GitHubClient):
             raise GitHubFailure(
                 "snapshot_mismatch", "GitHub returned a PR for a different repository.", 409
             )
-        if pull.state != "open":
+        if pull.state != "open" and not (pull.state == "closed" and pull.merged):
             raise GitHubFailure(
-                "unsupported_pr_state", "Intake currently supports open pull requests only.", 422
+                "unsupported_pr_state",
+                "Intake supports open pull requests and closed pull requests that were merged.",
+                422,
             )
         if not pull.head.repo or pull.head.repo.private or pull.base.repo.private:
             raise GitHubFailure(
@@ -225,6 +229,7 @@ async def collect_snapshot(reference: PullReference, github: GitHubClient):
             "body": pull.body,
             "url": reference.url,
             "state": pull.state,
+            "merged": pull.merged,
         },
         "base_target_sha": pull.base.sha,
         "base_sha": merge_base,

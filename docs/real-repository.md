@@ -33,11 +33,18 @@ and metadata against the
 [GitHub REST PR response](https://api.github.com/repos/pypa/packaging/pulls/925).
 Live metadata may change; the checked-in response records the capture.
 
-The normal HTTP intake and capture command currently accept open PRs only.
-This historical fixture preserves the actual `closed` state and uses the same
-pinned-checkout evaluator through a dedicated operator CLI. It does not pass
-the closed PR through open-only intake or change its state to make it acceptable.
+The normal HTTP intake and capture command accept open public PRs and closed
+public PRs whose GitHub metadata records `merged: true`. Closed unmerged PRs
+remain unsupported. This fixture was captured before historical intake support
+and preserves the actual `closed` state; the evaluator accepts it unchanged.
 No upstream Python was imported or executed while capturing metadata.
+
+To verify this historical PR in the dashboard, select **New verification** and
+paste `https://github.com/pypa/packaging/pull/925`, describe the newline validation
+requirement, capture the PR, and select the **packaging PR #925 name validation
+regression** profile. The repository browser continues to list open PRs. Capture
+preserves GitHub's actual closed/merged status and compares the PR head with the
+comparison merge base, rather than replacing the head with the merge commit.
 
 ## Reproduce
 
@@ -61,6 +68,20 @@ repository scripts. All Python source inspection and execution uses restricted
 Docker containers with read-only checkouts and networking disabled. The trusted
 image needs the pinned pytest and Ruff versions in its Dockerfile. The selected
 packaging test file needs no other third-party dependency.
+
+To capture fresh public metadata through the normal intake collector, then use
+the resulting snapshot instead of the fixture:
+
+```sh
+PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.repositories.capture \
+  https://github.com/pypa/packaging/pull/925 \
+  --output data/packaging-live-intake-2026-10-06.json
+```
+
+This capture performs read-only GitHub requests and executes no repository code.
+It verifies the file inventory, pinned diff and SHA-256, and checks metadata and
+repository visibility again before accepting the snapshot. Historical support
+keeps the existing public-head and deleted-fork restrictions.
 
 The command runs independent visible and edge-case suites, structural test
 review, Python impact inspection, differential Ruff checks, and the baseline
@@ -103,8 +124,9 @@ selected contract and tests remains unverified.
 ## Automated checks
 
 Offline deterministic tests verify the captured metadata/diff hashes, exact
-revision identities, requirement mappings, and CLI wiring without network access
-or executing upstream code:
+revision identities, requirement mappings, CLI wiring, and the normal API intake
+and export flow using the genuine historical metadata. They perform no network
+requests and execute no upstream code:
 
 ```sh
 backend/.venv/bin/python -m pytest backend/tests/test_real_repository.py -q

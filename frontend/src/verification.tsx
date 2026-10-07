@@ -83,6 +83,7 @@ type Report = {
   failure: Failure | null;
   checks: { name: string; status: string; explanation: string }[];
   snapshot: {
+    pull_request?: { state: string; merged?: boolean };
     base_sha: string;
     head_sha: string;
     diff_sha256: string;
@@ -335,6 +336,9 @@ export function Verification({
                 <div className="repo-label">
                   {report.repository}
                   <span className="pill">SAVED</span>
+                  {report.snapshot?.pull_request?.merged && (
+                    <span className="pill">MERGED PR</span>
+                  )}
                 </div>
                 <h2>{report.title}</h2>
                 <a href={report.pr_url} target="_blank" rel="noreferrer">

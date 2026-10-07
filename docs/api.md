@@ -43,12 +43,17 @@ inspect the record state and `failure.code`.
 
 No database connection is held during GitHub requests. A failed attempt retains
 its reason without saving a partial bundle. Retrying an expired GitHub session
-requires signing in again. Private, unavailable, moved, closed, or overly large PRs
-fail explicitly rather than yielding a partial success.
+requires signing in again. Intake supports open public PRs and closed public PRs
+whose GitHub metadata explicitly records `merged: true`. Closed unmerged PRs,
+unknown states, private or unavailable heads, moved repositories, and overly large
+PRs fail explicitly rather than yielding a partial success. Historical merged PRs
+can be submitted by URL through **New verification**; the repository browser lists
+open PRs.
 
 ## Evidence bundle
 
-- Public repository identity and PR title/body at capture time.
+- Public repository identity, PR title/body, actual `state`, and boolean `merged`
+  status at capture time. Merge status is metadata, not a correctness verdict.
 - `base_target_sha`: the PR target branch revision observed during intake.
 - `base_sha`: the **merge base**, which is the original revision for the PR diff.
 - `head_sha`: the proposed candidate revision, including public fork heads.
@@ -57,7 +62,9 @@ fail explicitly rather than yielding a partial success.
 - Review observations for test-file changes, file removals, and test configuration.
 
 The collector requests comparisons by full SHA, verifies aggregate file counts,
-and rechecks PR metadata before accepting the bundle. It also rechecks repository
+and rechecks PR metadata, including state and merge status, before accepting the
+bundle. A historical PR still uses its proposed head SHA and comparison merge base;
+the merge commit is not substituted for either revision. It also rechecks repository
 identity/visibility. A moving PR fails with `pr_changed`; it never silently mixes
 revisions. GitHub may omit binary contents, so a diff alone is not a full checkout.
 

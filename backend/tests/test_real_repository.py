@@ -10,7 +10,8 @@ import pytest
 
 from codehound.evaluation.registry import load_profiles
 from codehound.execution.real_repository import reproduce
-from codehound.repositories.intake import ChangedFile, Pull
+from codehound.repositories.intake import ChangedFile, Pull, collect_snapshot
+from codehound.repositories.urls import parse_pull_url
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "real_repository" / "packaging-pr-925"
 BASE = "033854a05229074ddb191d67da1f8e0165e665da"
@@ -48,6 +49,73 @@ def test_historical_fixture_preserves_actual_public_pr_metadata_and_diff():
     assert sum(item.deletions for item in files) == pull.deletions
     assert diff.count("diff --git ") == len(files)
     assert '+    r"^([A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])\\Z"' in diff
+
+
+@pytest.fixture
+def historical_github_bundle(github_bundle):
+    captured = snapshot()
+    github_bundle.repo = captured["repository"]
+    github_bundle.pull = json.loads((FIXTURE / "pull-request.json").read_text())
+    github_bundle.comparison = {
+        "base_commit": {"sha": captured["base_target_sha"]},
+        "merge_base_commit": {"sha": captured["base_sha"]},
+        "files": captured["files"],
+    }
+    github_bundle.patch = captured["diff"]
+    return github_bundle
+
+
+def test_normal_intake_accepts_genuine_historical_metadata_without_changing_state(
+    historical_github_bundle,
+):
+    captured = asyncio.run(
+        collect_snapshot(
+            parse_pull_url(snapshot()["pull_request"]["url"]), historical_github_bundle
+        )
+    )
+    assert captured["pull_request"]["state"] == "closed"
+    assert captured["pull_request"]["merged"] is True
+    assert captured["base_sha"] == captured["base_target_sha"] == BASE
+    assert captured["head_sha"] == HEAD
+    assert captured["diff_sha256"] == snapshot()["diff_sha256"]
+
+
+def test_historical_public_pr_can_be_saved_intaken_and_exported(
+    authenticated_client,
+    historical_github_bundle,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "codehound.api.verifications.GitHubClient", lambda token: historical_github_bundle
+    )
+    headers = {"X-CodeHound-Request": "1"}
+    response = authenticated_client.post(
+        "/api/verifications",
+        json={
+            "pr_url": snapshot()["pull_request"]["url"],
+            "issue_text": "Reject trailing newlines when package name validation is enabled.",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    identifier = response.json()["id"]
+    response = authenticated_client.post(f"/api/verifications/{identifier}/intake", headers=headers)
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["status"] == "ready", report
+    assert report["snapshot"]["pull_request"]["state"] == "closed"
+    assert report["snapshot"]["pull_request"]["merged"] is True
+    assert report["snapshot"]["base_sha"] == BASE and report["snapshot"]["head_sha"] == HEAD
+    assert all(check["status"] != "pass" for check in report["checks"])
+    assert report["confidence"] is None and report["execution_status"] == "not_run"
+    exported = authenticated_client.get(f"/api/verifications/{identifier}/export")
+    assert exported.json() == report
+    requests = len(historical_github_bundle.calls)
+    assert (
+        authenticated_client.post(f"/api/verifications/{identifier}/intake", headers=headers).json()
+        == report
+    )
+    assert len(historical_github_bundle.calls) == requests
 
 
 def test_real_profile_maps_independent_cases_and_freezes_existing_tests():
