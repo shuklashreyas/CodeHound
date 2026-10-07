@@ -55,7 +55,8 @@
     }
   ],
   "provenance": {
-    "kind": "historical_upstream_human_patch",
+    "kind": "historical_upstream_patch",
+    "authorship_method": "unknown",
     "author": "di",
     "merged": true,
     "merged_at": "2025-08-21T20:11:11Z",
@@ -66,7 +67,7 @@
   },
   "limitations": [
     "No repository code or tests have been executed during capture.",
-    "This historical upstream human-authored patch is an integration smoke example, not an agent benchmark or labeled negative dataset.",
+    "This historical upstream patch has unknown authorship method and is an integration smoke example, not an agent benchmark or labeled negative dataset.",
     "The HTTP intake API supports open PRs only; this operator-owned fixture preserves the actual closed state.",
     "Filename-based integrity observations are review hints, not verdicts."
   ]

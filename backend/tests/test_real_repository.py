@@ -39,7 +39,8 @@ def test_historical_fixture_preserves_actual_public_pr_metadata_and_diff():
     assert hashlib.sha256(diff.encode()).hexdigest() == captured["diff_sha256"]
     provenance = captured["provenance"]
     assert hashlib.sha256(metadata).hexdigest() == provenance["pull_metadata_sha256"]
-    assert provenance["kind"] == "historical_upstream_human_patch"
+    assert provenance["kind"] == "historical_upstream_patch"
+    assert provenance["authorship_method"] == "unknown"
     assert provenance["author"] == json.loads(metadata)["user"]["login"]
     assert provenance["merged"] is True
     files = [ChangedFile.model_validate(item) for item in captured["files"]]

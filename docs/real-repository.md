@@ -4,7 +4,8 @@ CodeHound includes a pinned reproduction of the genuine upstream
 [pypa/packaging PR #925](https://github.com/pypa/packaging/pull/925),
 **Correct regex for metadata 'name' format**. The upstream author `di` submitted
 the fix on August 21, 2025; it was merged the same day. This is a historical
-human-authored patch used to exercise the real repository workflow. It is not
+upstream patch used to exercise the real repository workflow. Its authorship
+method is unknown; GitHub metadata does not establish whether AI was used. It is not
 an AI agent benchmark, an adversarial patch, or evidence of a detection rate.
 
 The bug is narrow: `canonicalize_name(name, validate=True)` accepted an otherwise

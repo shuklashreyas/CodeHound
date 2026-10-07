@@ -2,7 +2,7 @@
   "id": "packaging-name-validation",
   "label": "packaging PR #925 name validation regression",
   "repository": "pypa/packaging",
-  "coverage": "Historical upstream human-authored PR #925 smoke test for canonicalize_name(name, validate=True). Checks trailing-newline rejection, representative name normalization, existing invalid-input handling, and the optional-validation default behavior. JSON expectations remain in the operator process. Bundled hidden cases are public independent edge cases, not secret tests. This is not an agent benchmark and does not establish full packaging correctness.",
+  "coverage": "Historical upstream PR #925 with unknown authorship method; smoke test for canonicalize_name(name, validate=True). Checks trailing-newline rejection, representative name normalization, existing invalid-input handling, and the optional-validation default behavior. JSON expectations remain in the operator process. Bundled hidden cases are public independent edge cases, not secret tests. This is not an agent benchmark and does not establish full packaging correctness.",
   "visible": {
     "schema_version": 1,
     "name": "packaging-name-visible",
