@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "name": "Requests task-level public API development probes",
+  "purpose": "development_pilot",
+  "adapter": "benchmarks/probes/requests_task_adapter.py",
+  "tasks": [
+    {
+      "task_id": "psf__requests-1142",
+      "repository": "psf/requests",
+      "base_commit": "22623bd8c265b78b161542663ee980738441c307",
+      "issue_sha256": "0192533ff2ef0c53a600b3ef02cb9dc20bf0998d56eeaee80ca1a76c46758eec",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "bodyless_get": {
+          "method": "GET",
+          "content_length": null
+        },
+        "get_with_payload": {
+          "method": "GET",
+          "content_length": "3"
+        },
+        "empty_post": {
+          "method": "POST",
+          "content_length": "0"
+        },
+        "post_with_payload": {
+          "method": "POST",
+          "content_length": "3"
+        },
+        "get_explicit_zero_length": {
+          "method": "GET",
+          "content_length": "0"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Issue and pinned baseline; candidate patch not viewed."
+      },
+      "notes": [
+        "Issue target: bodyless GET must not automatically gain Content-Length.",
+        "Regression examples preserve an explicit zero GET Content-Length, real body lengths, and empty POST length zero.",
+        "Public Session.request preparation runs; final Session.send is replaced with capture. No network request is sent."
+      ]
+    },
+    {
+      "task_id": "psf__requests-1724",
+      "repository": "psf/requests",
+      "base_commit": "1ba83c47ce7b177efe90d5f51f7760680f72eda0",
+      "issue_sha256": "eacde5d201658474274cce4558b5d2b8ae74d9fcc2ad6ddc76aaf003b2160b8a",
+      "supported": false,
+      "unsupported_reason": "requires_python_2_unicode_httplib_semantics",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Issue and pinned baseline; candidate patch not viewed."
+      },
+      "notes": [
+        "Issue requires Python 2.7 unicode method propagation into httplib with multipart binary data.",
+        "Python 3.9 cannot reproduce the Python 2 str/unicode semantics. No surrogate Python 3 assertion is substituted."
+      ]
+    },
+    {
+      "task_id": "psf__requests-1766",
+      "repository": "psf/requests",
+      "base_commit": "847735553aeda6e6633f2b32e14ba14ba86887a4",
+      "issue_sha256": "90d541e87a05a5135b7ee242c82702e5cad1e2cae9e5571fcbc032d7d6d80682",
+      "supported": false,
+      "unsupported_reason": "requires_digest_qop_task_specification_adjudication",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Issue and pinned baseline; candidate patch not viewed."
+      },
+      "notes": [
+        "Issue quotes RFC 2617 server challenge qop-options, which is quoted. Client Authorization message-qop is a single token in section 3.2.2.",
+        "The requested compatibility behavior and protocol grammar need human task/specification adjudication before assigning pass/fail expectations.",
+        "Primary reference: https://www.rfc-editor.org/rfc/rfc2617 sections 3.2.1 and 3.2.2."
+      ]
+    },
+    {
+      "task_id": "psf__requests-1921",
+      "repository": "psf/requests",
+      "base_commit": "3c88e520da24ae6f736929a750876e7654accc3d",
+      "issue_sha256": "3f7bdcd805645db3f6bbfa3476d3207f878afdfa4a91f8c8d56705d9aaf48e8d",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "session_none": {
+          "accept_encoding_present": false,
+          "accept_present": true,
+          "accept_unchanged": true
+        },
+        "request_none": {
+          "accept_encoding_present": false,
+          "accept_present": true,
+          "accept_unchanged": true
+        },
+        "delete_header": {
+          "accept_encoding_present": false,
+          "accept_present": true,
+          "accept_unchanged": true
+        },
+        "override": {
+          "accept_encoding_present": true,
+          "accept_present": true,
+          "accept_unchanged": true,
+          "accept_encoding_value": "identity"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "post_patch",
+        "basis": "Issue and public API exploration after prior candidate inspection."
+      },
+      "notes": [
+        "POST-HOC DEVELOPMENT: candidate was inspected during the previous benchmark block.",
+        "Exact issue: retain fresh Session default headers, set Accept-Encoding=None, prepare a GET.",
+        "Request-level None removal, deleting the header, overriding it, and preserving Accept are controls.",
+        "Not eligible for held-out accuracy or human ground truth."
+      ]
+    },
+    {
+      "task_id": "psf__requests-2317",
+      "repository": "psf/requests",
+      "base_commit": "091991be0da19de9108dbe5e3752917fea3d7fdc",
+      "issue_sha256": "9fdbda259c2e75551a5282e979edf4ca93ba378bee22df393fe02998991cfd1a",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "bytes_get": {
+          "method": "GET",
+          "method_is_text": true
+        },
+        "lowercase_bytes_post": {
+          "method": "POST",
+          "method_is_text": true
+        },
+        "text_get": {
+          "method": "GET",
+          "method_is_text": true
+        },
+        "lowercase_text_patch": {
+          "method": "PATCH",
+          "method_is_text": true
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Issue and pinned baseline; candidate patch not viewed."
+      },
+      "notes": [
+        "Issue target: bytes HTTP methods must become text GET/POST, rather than a bytes repr literal.",
+        "Public Session.request is essential because the issue conversion happens before Request preparation.",
+        "Text and lowercase text methods are regression controls; no network request is sent."
+      ]
+    },
+    {
+      "task_id": "psf__requests-2931",
+      "repository": "psf/requests",
+      "base_commit": "5f7a3a74aab1625c2bb65f643197ee885e3da576",
+      "issue_sha256": "c36c337f6c5d918e8d193684510213e2eaed8633e575b819757674cca0d980fd",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "issue_utf8_binary": {
+          "body_hex": "c3b6c3b6c3b6",
+          "content_length": "6"
+        },
+        "non_utf8_binary": {
+          "body_hex": "ff0080616263",
+          "content_length": "6"
+        },
+        "ascii_binary": {
+          "body_hex": "68656c6c6f",
+          "content_length": "5"
+        },
+        "form_regression": {
+          "body_hex": "613d62",
+          "content_length": "3"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Issue and pinned baseline; candidate patch not viewed."
+      },
+      "notes": [
+        "Issue target: UTF-8 binary PUT body must not fail preparation.",
+        "Additional arbitrary non-UTF-8 bytes including NUL must remain byte-for-byte intact.",
+        "Prepared text is UTF-8 normalized solely for observation; ASCII and form bodies are regression controls.",
+        "Only preparation is checked; final Session.send is replaced with capture."
+      ]
+    }
+  ],
+  "limitations": [
+    "No human verdicts are provided or inferred.",
+    "Task probes cover selected public behavior and regression controls, not complete correctness.",
+    "Expectations are retained outside candidate containers. Adapter observations share a process with candidate code.",
+    "Requests 1921 is post-hoc development and is excluded from held-out claims."
+  ]
+}
