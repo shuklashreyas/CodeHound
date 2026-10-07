@@ -102,6 +102,10 @@ visible tests or establish a human correctness label.
 
 ## Human review and metrics
 
+The [human-review protocol](human-review.md) defines correct, incorrect, and unclear
+judgments, distinguishes a single-reviewer pilot from consensus, and preserves
+initial reviews separately from later unblinded evidence and adjudication.
+
 Fifty neutral review packets are retained in `data/ai-patch-review-2026-10-07/`.
 Fifty additional AI assistance notes cite retained issue and patch identities;
 some also cite inspected baseline source. The notes explicitly record inspection

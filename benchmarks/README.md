@@ -55,6 +55,9 @@ when interpreting this historic code.
 
 ## Human judgments are a separate input
 
+Use the [fixed human-review rubric](human-review.md) for the single-reviewer pilot,
+independent second reviews, and explicit handling of disagreements.
+
 SWE-bench Verified's human filtering concerns tasks and their tests; it does not
 establish the correctness of every generated patch. Neither upstream automated
 outcomes nor CodeHound's own decisions may supply human ground truth.
