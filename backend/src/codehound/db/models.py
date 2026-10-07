@@ -96,3 +96,24 @@ class ExecutionNamespace(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     value: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+
+
+class AuthRecord(Base):
+    __tablename__ = "auth_records"
+    __table_args__ = (
+        CheckConstraint("kind IN ('flow', 'session')", name="valid_auth_kind"),
+        Index("ix_auth_records_expiry", "expires_ms"),
+    )
+
+    kind: Mapped[str] = mapped_column(String(10), primary_key=True)
+    id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class AuthStoreKey(Base):
+    __tablename__ = "auth_store_key"
+    __table_args__ = (CheckConstraint("id = 1", name="single_auth_store_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)

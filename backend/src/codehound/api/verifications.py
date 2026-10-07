@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from codehound.api import github
+from codehound.core.request_limits import require_mutation_limit
 from codehound.core.time import utc
 from codehound.db.jobs import JobStore
 from codehound.db.store import StoreConflict, VerificationStore
@@ -99,10 +100,12 @@ def report(item, latest=None):
 def create_verification(
     submission: VerificationCreate,
     response: Response,
+    request: Request,
     login=Depends(principal),
     database=Depends(store),
     idempotency_key: Annotated[UUID | None, Header()] = None,
 ):
+    require_mutation_limit(request, login["user"]["id"])
     try:
         item, created = database.create(
             login["user"]["id"],
@@ -150,6 +153,7 @@ async def intake_verification(
     login=Depends(principal),
     database=Depends(store),
 ):
+    await run_in_threadpool(require_mutation_limit, request, login["user"]["id"])
     try:
         item, claim = await run_in_threadpool(database.claim, str(identifier), login["user"]["id"])
     except StoreConflict as exc:
@@ -167,7 +171,7 @@ async def intake_verification(
     except GitHubFailure as exc:
         failure = {"code": exc.code, "message": exc.message}
         if exc.status == 401:
-            github.sessions.pop(request.cookies.get(github.SESSION_COOKIE, ""), None)
+            await run_in_threadpool(github.revoke_session, request)
     except TimeoutError:
         failure = {"code": "intake_timeout", "message": "Intake exceeded its 90-second limit."}
     except Exception:

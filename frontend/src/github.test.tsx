@@ -160,3 +160,45 @@ it("preserves a saved verification ID in the sign-in link without arbitrary dest
     "/api/auth/github/login",
   );
 });
+
+it("exposes a bounded Retry-After value without automatically repeating mutations", async () => {
+  const { api, ApiError } = await import("./github");
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Too many requests." }), {
+        status: 429,
+        headers: { "Retry-After": "30" },
+      }),
+    );
+  vi.stubGlobal("fetch", fetcher);
+  const error = await api("/verifications", { method: "POST" }).catch(
+    (error) => error,
+  );
+  expect(error).toBeInstanceOf(ApiError);
+  if (!(error instanceof ApiError)) throw new Error("Expected an API error");
+  expect(error.retryAfterSeconds).toBe(30);
+  expect(error.message).toContain("Retry in 30 seconds");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it.each(["-1", "NaN", "999999999", "Thu, 01 Jan 1970 00:00:00 GMT"])(
+  "ignores invalid or unbounded retry header %s",
+  async (header) => {
+    const { api, ApiError } = await import("./github");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ detail: "Limited" }), {
+            status: 429,
+            headers: { "Retry-After": header },
+          }),
+        ),
+    );
+    const error = await api("/verifications").catch((error) => error);
+    if (!(error instanceof ApiError)) throw new Error("Expected an API error");
+    expect(error.retryAfterSeconds).toBeUndefined();
+    expect(error.message).toBe("Limited");
+  },
+);

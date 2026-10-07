@@ -226,7 +226,11 @@ export function Verification({
         failures += 1;
         if (temporary && failures <= 4) {
           setRetryAttempt(failures);
-          timer = setTimeout(() => void load(), 2000 * 2 ** (failures - 1));
+          const delay = Math.max(
+            2000 * 2 ** (failures - 1),
+            (failure.retryAfterSeconds || 0) * 1000,
+          );
+          timer = setTimeout(() => void load(), delay);
         } else {
           setRetryAttempt(0);
         }

@@ -1,14 +1,18 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from starlette.concurrency import run_in_threadpool
 
 from codehound.api.executions import router as executions_router
+from codehound.api.github import memory_store
 from codehound.api.github import router as github_router
 from codehound.api.health import router as health_router
 from codehound.api.verifications import router as verifications_router
 from codehound.core.limits import SubmissionBodyLimit
+from codehound.db.auth import SharedAuthStore
 from codehound.db.database import Database
+from codehound.db.rate_limits import rate_limit_settings
 
 
 @asynccontextmanager
@@ -17,6 +21,13 @@ async def lifespan(app):
     try:
         await run_in_threadpool(database.migrate)
         app.state.database = database
+        rate_limit_settings()
+        key = os.getenv("CODEHOUND_SESSION_ENCRYPTION_KEY")
+        app.state.auth_store = (
+            await run_in_threadpool(SharedAuthStore, database, key)
+            if key is not None
+            else memory_store
+        )
         yield
     finally:
         database.close()

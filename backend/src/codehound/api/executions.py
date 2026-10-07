@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from codehound.api.verifications import principal, store, write_access
+from codehound.core.request_limits import require_mutation_limit
 from codehound.db.jobs import JobStore, QueueCapacity, QueueConfiguration
 from codehound.db.store import StoreConflict
 from codehound.evaluation.job_schemas import (
@@ -61,6 +62,7 @@ def enqueue(
     identifier: UUID,
     submission: ExecutionCreate,
     response: Response,
+    request: Request,
     login=Depends(principal),
     records=Depends(store),
     queue=Depends(jobs),
@@ -74,6 +76,7 @@ def enqueue(
     profile = profiles().get(submission.profile_id)
     if profile is None:
         raise HTTPException(422, "Select an available operator-owned test profile.")
+    require_mutation_limit(request, login["user"]["id"])
     try:
         job, created = queue.enqueue(
             str(identifier),

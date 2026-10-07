@@ -87,7 +87,7 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
-uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000 --no-access-log
+uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 ```
 
 In another terminal:
@@ -138,12 +138,18 @@ profile/repository information and excludes private repositories.
 
 State and PKCE protect sign-in. Access tokens stay on the server; the browser gets
 an opaque HttpOnly cookie. HTTPS origins use Secure cookies. Sign-out removes the
-local session; revoke the underlying grant in [GitHub Applications](https://github.com/settings/applications).
+session; revoke the underlying grant in [GitHub Applications](https://github.com/settings/applications).
 
-**Sessions are currently process-local:** restarting the API signs users out, but
-saved verification records remain. Run one API worker. A deployment needs a shared,
-expiring credential/session store, HTTPS, and request rate limits. Accounts are
-identified by immutable GitHub user IDs rather than changeable login names.
+**Sessions default to process memory:** use one API worker for local development;
+restarting it signs users out without deleting verification records. Configure
+`CODEHOUND_SESSION_ENCRYPTION_KEY` to enable encrypted, expiring database sessions
+shared across workers. See [shared session setup](docs/shared-sessions.md).
+Accounts use immutable GitHub user IDs rather than changeable login names.
+
+Database-backed request limits protect OAuth login and verification mutations;
+429 responses include `Retry-After`, which the UI displays. See
+[request limits](docs/request-limits.md) for configuration and proxy behavior.
+Deployment still requires HTTPS and suitable infrastructure isolation.
 
 ## Capture PR evidence
 

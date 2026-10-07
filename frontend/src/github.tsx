@@ -15,6 +15,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
@@ -47,11 +48,24 @@ export async function api<T>(
   }
   const data = await response.json().catch(() => null);
   if (!response.ok || !data) {
-    throw new ApiError(
+    const retryHeader = response.headers.get("Retry-After");
+    const retryAfter =
+      retryHeader &&
+      /^[0-9]{1,5}$/.test(retryHeader) &&
+      Number(retryHeader) > 0 &&
+      Number(retryHeader) <= 86400
+        ? Number(retryHeader)
+        : undefined;
+    const message =
       typeof data?.detail === "string"
         ? data.detail
-        : "CodeHound returned an unexpected response. Please try again.",
+        : "CodeHound returned an unexpected response. Please try again.";
+    throw new ApiError(
+      response.status === 429 && retryAfter
+        ? `${message} Retry in ${retryAfter} seconds.`
+        : message,
       response.status,
+      retryAfter,
     );
   }
   return data as T;
