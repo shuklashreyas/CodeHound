@@ -21,11 +21,18 @@ Drafts, intake, queued execution, cancellation, and results are persisted. The
 execution API accepts only a matching operator-owned profile ID. A separate worker
 claims jobs with expiring leases and keeps assertions outside candidate containers.
 The frontend connects this flow and keeps its illustrative sample separate from real execution evidence. None of these components implements a
-calibrated ML judge, general static analyzer, or semantic requirement verifier yet.
+calibrated ML judge or semantic requirement verifier yet.
 Changed Python test structure is inspected in an isolated parser; see
 [test-integrity.md](test-integrity.md). Operator-defined requirements map to case
-outcomes, and Python source inspection supplies syntax/import-impact evidence.
+outcomes and bounded expected/observed diagnostics. Python source inspection supplies
+syntax/import-impact evidence, while isolated, pinned Ruff E/F checks separate new
+findings from existing and resolved findings. See [static analysis](static-analysis.md).
 These mechanisms do not establish complete semantic issue coverage.
+
+Operator-selected existing pytest files are frozen from the baseline and run against
+both revisions. These [repository tests](repository-tests.md) carry lower trust than
+external JSON assertions: repository code shares their process and may manipulate
+the framework. Their results do not override independent behavioral judgments.
 
 ## Components
 
@@ -67,12 +74,18 @@ documented in `independent-evaluator.md`; arbitrary pytest does not gain that bo
 
 ## Authentication
 
-OAuth state and PKCE bind sign-in to a browser. Access tokens are stored only in
-process-local server sessions; the browser gets an opaque HttpOnly cookie. HTTPS
-origins use Secure cookies. Requests that mutate records require a custom header
-and the configured origin. Public-only constraints apply to metadata and PR intake.
-Saved ownership uses immutable GitHub IDs. Restarting the API signs users out but
-does not delete saved drafts. Multi-worker deployments need a shared session store.
+OAuth state and PKCE bind sign-in to a browser. Access tokens remain server-side;
+the browser gets an opaque HttpOnly cookie. HTTPS origins use Secure cookies.
+The default local session store uses process memory. An operator can configure a
+shared encryption key to enable [encrypted database sessions](shared-sessions.md),
+atomic single-use OAuth flows, and revocation across workers. Wrong keys and
+database failures fail closed; keys are never supplied to candidate containers.
+
+Requests that mutate records require a custom header and the configured origin.
+Database-backed [request limits](request-limits.md) bound OAuth login and account
+mutations. Documented startup disables proxy-header trust to prevent forged client
+addresses from bypassing login limits. Public-only constraints apply to metadata
+and PR intake. Saved ownership uses immutable GitHub IDs.
 
 ## Research evaluation
 
@@ -87,10 +100,18 @@ The [benchmark runner](benchmark.md) retains labels, abstentions, false positive
 split-aware metrics, and immutable input identities. It does not establish real
 agent performance. Numerical confidence requires independent calibration data.
 
+Three pinned historical upstream tasks now exercise packaging and Boltons through
+real public GitHub checkout, independent contracts, and frozen repository tests.
+The [real task reproductions](real-tasks.md) retain exact revisions and evidence
+identities; upstream authorship method is not established. A separate
+[packaging mutation experiment](real-experiment.md) catches two deliberately bad
+patches that pass visible cases and all 54 existing tests. Those synthetic negatives
+demonstrate the mechanism; they do not measure accuracy on real agent patches.
+
 ## Next milestones
 
 1. Gather human-reviewed real agent patches and held-out evaluation tasks.
 2. Add operator-owned profiles for more repository contracts and languages.
-3. Broaden structural integrity and static analysis beyond Python AST inspection.
-4. Harden worker storage quotas, request-rate limits, and deployment isolation.
+3. Broaden structural integrity and static analysis beyond Python AST and Ruff E/F.
+4. Harden worker storage quotas and deployment isolation.
 5. Compare stronger baselines and calibrate learned evaluators only with sufficient data.
