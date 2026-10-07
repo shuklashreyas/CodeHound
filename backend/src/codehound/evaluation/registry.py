@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from codehound.execution.profiles import Contract, TrustedSuite
+from codehound.execution.repository_tests import RepositoryTestConfig
 from codehound.repositories.urls import parse_pull_url
 
 
@@ -29,6 +30,7 @@ class EvaluationProfile(Contract):
     coverage: str = Field(min_length=1, max_length=2000)
     visible: TrustedSuite
     hidden: TrustedSuite | None = None
+    repository_tests: RepositoryTestConfig | None = None
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
@@ -61,6 +63,17 @@ class EvaluationProfile(Contract):
             ],
             "visible_cases": len(self.visible.cases),
             "hidden_cases": len(self.hidden.cases) if self.hidden else 0,
+            "repository_tests": (
+                {
+                    "mode": "frozen_baseline",
+                    "selected_paths": len(self.repository_tests.test_paths),
+                    "target_packages": self.repository_tests.target_packages,
+                    "timeout_seconds": self.repository_tests.timeout_seconds,
+                    "trust": "repository_controlled",
+                }
+                if self.repository_tests
+                else None
+            ),
         }
 
 

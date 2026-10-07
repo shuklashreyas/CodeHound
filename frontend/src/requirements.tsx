@@ -4,6 +4,8 @@ type State = {
   failed: number;
   unverified: number;
 };
+type Preview = { text: string; truncated: boolean };
+type Observation = { status: string; response?: Preview };
 export type RequirementEvidence = {
   source: string;
   requirements: {
@@ -16,11 +18,45 @@ export type RequirementEvidence = {
       case_id: string;
       baseline: string;
       candidate: string;
+      target?: { module: string; function: string; source_directory: string };
+      diagnostics?: {
+        expectation: {
+          visibility: string;
+          kind?: string;
+          text?: string;
+          truncated?: boolean;
+        };
+        baseline: Observation;
+        candidate: Observation;
+      };
     }[];
   }[];
   unmapped_cases: { suite: string; case_id: string }[];
   limitations: string[];
 };
+function ObservationValue({
+  label,
+  value,
+}: {
+  label: string;
+  value: Observation;
+}) {
+  return (
+    <div className="case-observation">
+      <strong>{label}</strong>
+      {value.status === "observed" && value.response ? (
+        <>
+          <pre>{value.response.text}</pre>
+          {value.response.truncated && (
+            <small>Preview truncated; inspect raw execution evidence.</small>
+          )}
+        </>
+      ) : (
+        <p>No validated response available.</p>
+      )}
+    </div>
+  );
+}
 const labels: Record<string, string> = {
   supported_by_checks: "Mapped examples pass",
   contradicted: "Contradicted by checks",
@@ -70,6 +106,48 @@ export function Requirements({ result }: { result: RequirementEvidence }) {
                     {test.baseline.replaceAll("_", " ")} →{" "}
                     {test.candidate.replaceAll("_", " ")}
                   </span>
+                  {test.target && (
+                    <p className="muted">
+                      Configured target:{" "}
+                      <code>
+                        {test.target.module}.{test.target.function}
+                      </code>{" "}
+                      · source root <code>{test.target.source_directory}</code>
+                    </p>
+                  )}
+                  {test.diagnostics && (
+                    <details className="evidence-details">
+                      <summary>Inspect case evidence · {test.case_id}</summary>
+                      <div className="case-observation">
+                        <strong>Expected behavior</strong>
+                        {test.diagnostics.expectation.visibility === "shown" ? (
+                          <>
+                            <pre>{test.diagnostics.expectation.text}</pre>
+                            {test.diagnostics.expectation.truncated && (
+                              <small>Expected-value preview truncated.</small>
+                            )}
+                          </>
+                        ) : (
+                          <p>
+                            Independent expected answer withheld. The evaluator
+                            checks the{" "}
+                            {test.diagnostics.expectation.kind === "exception"
+                              ? "expected exception"
+                              : "expected return value"}{" "}
+                            outside the candidate container.
+                          </p>
+                        )}
+                      </div>
+                      <ObservationValue
+                        label="Baseline response"
+                        value={test.diagnostics.baseline}
+                      />
+                      <ObservationValue
+                        label="Candidate response"
+                        value={test.diagnostics.candidate}
+                      />
+                    </details>
+                  )}
                 </li>
               ))}
             </ul>

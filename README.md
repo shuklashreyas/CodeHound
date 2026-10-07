@@ -29,6 +29,12 @@ execution, hidden tests, patch integrity checks, and repository context.
   test outcomes, with missing coverage kept explicit.
 - **Python impact:** differential syntax checks and bounded static import trails
   identifying possible downstream files.
+- **Differential Ruff:** pinned E/F rules distinguish new, resolved, and existing
+  findings while ignoring candidate configuration. Incomplete scans stay inconclusive.
+- **Existing repository tests:** operator-selected baseline pytest inputs are frozen
+  and run against both revisions as explicitly lower-trust evidence.
+- **Real repository example:** a pinned upstream `pypa/packaging` fix reproduces
+  three independent improvements while its 54 baseline repository tests pass on both versions.
 - **Benchmark runner:** a labeled 12-patch synthetic corpus, visible-only vs independent
   decisions, false-positive counts, split-aware metrics, and atomic evidence checkpoints.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
@@ -38,8 +44,9 @@ The signed-in dashboard connects the full flow: **capture PR → select an opera
 profile → run both revisions → compare evidence**. It shows live progress,
 cancellation, execution history, changed files, per-case outcomes, and JSON exports.
 The separate worker executes code; the web/API process queues jobs. Repositories
-without an operator-owned profile cannot run yet. The bundled CodeHound profiles
-check PR URL parsing and comparison-verdict aggregation, not entire PR correctness.
+without an operator-owned profile cannot run yet. The bundled profiles
+check CodeHound URL parsing/verdict aggregation and packaging name validation,
+not entire PR correctness.
 A `ready` intake record means evidence was captured, not that the patch is correct.
 Unexecuted checks remain `not_run`, and confidence is unscored.
 
@@ -247,3 +254,7 @@ public synthetic corpus does not establish real-world detection performance.
 Further implementation details: [worker recovery](docs/worker-recovery.md),
 [requirement evidence](docs/requirement-evidence.md), and
 [Python syntax/import impact](docs/python-impact.md).
+
+A real upstream workflow is documented in [the packaging reproduction](docs/real-repository.md).
+See [frozen repository tests](docs/repository-tests.md) and
+[differential static analysis](docs/static-analysis.md) for trust boundaries and limits.

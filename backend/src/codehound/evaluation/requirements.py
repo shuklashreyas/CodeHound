@@ -1,5 +1,7 @@
 """Connect explicit operator requirements to evidence, without inferring issue coverage."""
 
+import json
+
 from codehound.execution.results import validate_report
 
 
@@ -40,6 +42,35 @@ def state(outcomes):
     return {"status": status, **counts}
 
 
+def preview(value):
+    """Bound display-only JSON while keeping truncation explicit."""
+    text = json.dumps(value, ensure_ascii=True, allow_nan=False, sort_keys=True)
+    return {"text": text[:2000], "truncated": len(text) > 2000}
+
+
+def observation_detail(run, case_id, outcome):
+    if outcome == "not_run":
+        return {"status": "unavailable"}
+    matches = [
+        item.get("observation")
+        for item in run.get("case_evidence") or []
+        if item.get("case_id") == case_id
+    ]
+    if len(matches) != 1 or not isinstance(matches[0], dict):
+        return {"status": "unavailable"}
+    observation = matches[0]
+    response = observation.get("call_response")
+    if (
+        observation.get("evidence_error")
+        or observation.get("status") != "completed"
+        or observation.get("exit_code") != 0
+        or not isinstance(response, dict)
+        or response.get("kind") not in ("returned", "raised")
+    ):
+        return {"status": "unavailable"}
+    return {"status": "observed", "response": preview(response)}
+
+
 def requirement_evidence(profile, artifact):
     inventories = {}
     for name, suite in artifact.get("suites", {}).items():
@@ -56,18 +87,42 @@ def requirement_evidence(profile, artifact):
         cases = []
         for reference in requirement.cases:
             suite = getattr(profile, reference.suite)
+            case = next(item for item in suite.cases if item.id == reference.case_id)
             nodeid = f"{suite.name}::{reference.case_id}"
             referenced.add((reference.suite, reference.case_id))
+            outcomes = {
+                revision: inventories.get(reference.suite, {})
+                .get(revision, {})
+                .get(nodeid, "not_run")
+                for revision in ("baseline", "candidate")
+            }
             cases.append(
                 {
                     "suite": reference.suite,
                     "case_id": reference.case_id,
                     "nodeid": nodeid,
-                    **{
-                        revision: inventories.get(reference.suite, {})
-                        .get(revision, {})
-                        .get(nodeid, "not_run")
-                        for revision in ("baseline", "candidate")
+                    **outcomes,
+                    "target": {
+                        "module": suite.module,
+                        "function": suite.function,
+                        "source_directory": suite.source_directory,
+                    },
+                    "diagnostics": {
+                        "expectation": (
+                            {"visibility": "shown", **preview(case.expect.model_dump())}
+                            if reference.suite == "visible"
+                            else {"visibility": "withheld", "kind": case.expect.kind}
+                        ),
+                        **{
+                            revision: observation_detail(
+                                artifact.get("suites", {})
+                                .get(reference.suite, {})
+                                .get(revision, {}),
+                                reference.case_id,
+                                outcomes[revision],
+                            )
+                            for revision in ("baseline", "candidate")
+                        },
                     },
                 }
             )
@@ -101,5 +156,7 @@ def requirement_evidence(profile, artifact):
             "Passing mapped examples supports only those observations; "
             "it does not prove a general requirement.",
             "Completeness of these requirements against the submitted issue remains unverified.",
+            "Independent expected answers are withheld from diagnostics; "
+            "observed candidate responses are not trusted as proof of internal execution.",
         ],
     }

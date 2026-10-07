@@ -150,3 +150,42 @@ def execution_checks(checks, job):
             f"{len(affected)} displayed downstream Python files may depend on changed paths. "
             "Import reachability is a review hint, not proof of a regression."
         )
+
+    static = job.artifact.get("static_analysis")
+    if static:
+        check = by_name["static_analysis"]
+        syntax_failed = bool(impact and impact.get("new_syntax_errors"))
+        complete = static.get("status") == "completed"
+        count = static.get("counts", {}).get("new", 0) if complete else 0
+        check.status = (
+            "fail"
+            if syntax_failed
+            else "needs_review"
+            if count
+            else "unknown"
+            if complete
+            else "inconclusive"
+        )
+        check.explanation = (
+            (f"{len(impact['new_syntax_errors'])} new syntax errors. " if syntax_failed else "")
+            + (
+                f"Ruff E/F comparison: {count} new, "
+                f"{static['counts']['resolved']} resolved, "
+                f"{static['counts']['existing']} existing findings. "
+                if complete
+                else "Ruff comparison is incomplete; new findings cannot be determined. "
+            )
+            + "Findings require review; types, security and runtime correctness remain unverified."
+        )
+
+    repository = job.artifact.get("repository_tests")
+    if repository and repository.get("test_comparison"):
+        count = len(repository["test_comparison"].get("regressions", []))
+        if count:
+            check = by_name["regression_safety"]
+            if check.status != "fail":
+                check.status = "needs_review"
+            check.explanation += (
+                f" Frozen repository tests report {count} possible regressions. "
+                "This evidence shares a process with repository code and needs independent review."
+            )

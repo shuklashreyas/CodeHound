@@ -133,3 +133,75 @@ def test_partial_valid_evidence_retains_requirement_contradiction():
     assert requirement["candidate"]["status"] == "contradicted"
     assert requirement["candidate"]["failed"] == 1
     assert requirement["candidate"]["unverified"] == 1
+
+
+def test_case_diagnostics_show_visible_expectations_but_withhold_independent_answers():
+    config = profile()
+    evidence = artifact(hidden={"url-independent::credentials": "failed"})
+    for name, suite in (("visible", config.visible), ("hidden", config.hidden)):
+        for revision in ("baseline", "candidate"):
+            evidence["suites"][name][revision]["case_evidence"] = [
+                {
+                    "case_id": case.id,
+                    "observation": {
+                        "status": "completed",
+                        "exit_code": 0,
+                        "evidence_error": None,
+                        "call_response": {"kind": "returned", "value": "observed value"},
+                    },
+                }
+                for case in suite.cases
+            ]
+    result = requirement_evidence(config, evidence)
+    visible = result["requirements"][0]["cases"][0]
+    assert visible["diagnostics"]["expectation"]["visibility"] == "shown"
+    assert visible["target"]["module"] == config.visible.module
+    hidden = result["requirements"][1]["cases"][0]
+    assert hidden["diagnostics"]["expectation"] == {"visibility": "withheld", "kind": "exception"}
+    assert hidden["diagnostics"]["candidate"]["response"]["text"] == (
+        '{"kind": "returned", "value": "observed value"}'
+    )
+    evidence["suites"]["hidden"]["candidate"]["evaluator_sha256"] = "different"
+    invalid = requirement_evidence(config, evidence)["requirements"][1]["cases"][0]
+    assert invalid["diagnostics"]["candidate"] == {"status": "unavailable"}
+
+
+def test_case_diagnostics_are_bounded_and_do_not_render_unvalidated_observations():
+    config = profile()
+    evidence = artifact()
+    case = config.visible.cases[0]
+    observation = {
+        "status": "completed",
+        "exit_code": 0,
+        "evidence_error": None,
+        "call_response": {"kind": "returned", "value": "x" * 10000},
+    }
+    evidence["suites"]["visible"]["candidate"]["case_evidence"] = [
+        {"case_id": case.id, "observation": observation}
+    ]
+    row = requirement_evidence(config, evidence)["requirements"][0]["cases"][0]
+    assert row["diagnostics"]["candidate"]["response"]["truncated"]
+    assert len(row["diagnostics"]["candidate"]["response"]["text"]) == 2000
+    observation["evidence_error"] = "invalid_response"
+    row = requirement_evidence(config, evidence)["requirements"][0]["cases"][0]
+    assert row["diagnostics"]["candidate"] == {"status": "unavailable"}
+
+
+def test_static_and_repository_evidence_do_not_become_blanket_passes():
+    evidence = artifact()
+    evidence["static_analysis"] = {
+        "status": "completed",
+        "counts": {"new": 2, "resolved": 1, "existing": 3},
+    }
+    evidence["repository_tests"] = {"test_comparison": {"regressions": [{"nodeid": "test_one"}]}}
+    checks = unrun_checks()
+    execution_checks(checks, SimpleNamespace(status="completed", artifact=evidence))
+    by_name = {item.name: item for item in checks}
+    assert by_name["static_analysis"].status == "needs_review"
+    assert "2 new" in by_name["static_analysis"].explanation
+    assert by_name["regression_safety"].status == "needs_review"
+    assert by_name["task_completion"].status == "not_run"
+    evidence["static_analysis"]["status"] = "inconclusive"
+    execution_checks(checks, SimpleNamespace(status="completed", artifact=evidence))
+    assert by_name["static_analysis"].status == "inconclusive"
+    assert "cannot be determined" in by_name["static_analysis"].explanation

@@ -2037,3 +2037,26 @@ footer {
   font-size: 0.8rem;
   line-height: 1.6;
 }
+
+.case-observation {
+  margin: 12px 0;
+  min-width: 0;
+}
+.case-observation strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.case-observation pre {
+  padding: 12px;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--canvas, #f6f7f9);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.case-observation small {
+  color: var(--muted, #69717d);
+}

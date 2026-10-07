@@ -9,6 +9,7 @@ from pathlib import Path
 from codehound.execution.docker import DockerRunner
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.profiles import TrustedSuite
+from codehound.execution.repository_tests import RepositoryTestConfig, run_repository_tests
 from codehound.execution.results import compare_tests, summarize_comparisons
 from codehound.repositories.checkout import GitWorkspace
 from codehound.repositories.urls import parse_pull_url
@@ -58,9 +59,14 @@ async def verify_snapshot(
     on_progress=None,
     integrity_analyzer=None,
     impact_analyzer=None,
+    static_analyzer=None,
+    repository_test_config=None,
+    repository_test_runner=None,
 ):
     if mode not in ("pytest", "independent"):
         raise ValueError("Unsupported evaluator mode.")
+    if repository_test_config is not None:
+        repository_test_config = RepositoryTestConfig.model_validate(repository_test_config)
     if snapshot.get("schema_version") != 1:
         raise ValueError("Unsupported snapshot schema.")
     reference = parse_pull_url(snapshot["pull_request"]["url"])
@@ -88,6 +94,8 @@ async def verify_snapshot(
     results = {}
     integrity = None
     impact = None
+    static = None
+    repository_tests = None
     if on_progress:
         await on_progress("checkout")
     async with workspace_factory(
@@ -101,6 +109,10 @@ async def verify_snapshot(
             if on_progress:
                 await on_progress("repository_impact")
             impact = await impact_analyzer(snapshot, checkouts, runner.image_id)
+        if static_analyzer is not None:
+            if on_progress:
+                await on_progress("static_analysis")
+            static = await static_analyzer(snapshot, checkouts, runner.image_id)
         for name, tests in suites.items():
             if on_progress:
                 await on_progress(f"{name}_baseline")
@@ -117,6 +129,14 @@ async def verify_snapshot(
                 "comparison": comparison(baseline, candidate),
                 "test_comparison": compare_tests(baseline, candidate),
             }
+        if repository_test_config is not None:
+            repository_tests = await run_repository_tests(
+                checkouts,
+                repository_test_config,
+                runner.image_id,
+                runner=repository_test_runner,
+                on_progress=on_progress,
+            )
     return {
         "schema_version": 2,
         "evaluation_mode": mode,
@@ -127,6 +147,8 @@ async def verify_snapshot(
         "suites": results,
         "test_integrity": integrity,
         "python_impact": impact,
+        "static_analysis": static,
+        "repository_tests": repository_tests,
         "assessment": summarize_comparisons(results),
         "confidence": None,
         "limitations": [
@@ -152,6 +174,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--inspect-tests", action="store_true")
     parser.add_argument("--inspect-python", action="store_true")
+    parser.add_argument("--repository-test-config", type=Path)
+    parser.add_argument("--inspect-static", action="store_true")
     parser.add_argument("--mode", choices=("pytest", "independent"), default="pytest")
     args = parser.parse_args()
     if args.output.exists():
@@ -161,11 +185,19 @@ def main():
     runner_class = IndependentRunner if args.mode == "independent" else DockerRunner
     runner = runner_class(args.image_id, timeout_seconds=args.timeout)
     snapshot = json.loads(args.snapshot.read_text())
+    repository_config = None
+    if args.repository_test_config:
+        if args.repository_test_config.stat().st_size > 16 * 1024:
+            parser.error("Repository test configuration exceeds 16 KiB.")
+        repository_config = RepositoryTestConfig.model_validate_json(
+            args.repository_test_config.read_bytes()
+        )
     suites = {"visible": args.visible_tests}
     if args.hidden_tests:
         suites["hidden"] = args.hidden_tests
     from codehound.execution.impact import analyze_python_impact
     from codehound.execution.integrity import analyze_test_integrity
+    from codehound.execution.static_analysis import analyze_static
 
     result = asyncio.run(
         verify_snapshot(
@@ -175,6 +207,8 @@ def main():
             mode=args.mode,
             integrity_analyzer=analyze_test_integrity if args.inspect_tests else None,
             impact_analyzer=analyze_python_impact if args.inspect_python else None,
+            repository_test_config=repository_config,
+            static_analyzer=analyze_static if args.inspect_static else None,
         )
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

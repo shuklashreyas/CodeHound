@@ -6,6 +6,8 @@ import { Requirements } from "./requirements";
 import type { RequirementEvidence } from "./requirements";
 import { IntegrityEvidence } from "./integrity";
 import type { IntegrityResult } from "./integrity";
+import { StaticAnalysisEvidence } from "./static-analysis";
+import type { StaticAnalysis } from "./static-analysis";
 
 type Profile = {
   id: string;
@@ -33,6 +35,21 @@ type Suite = {
   candidate: unknown;
   test_comparison: Comparison;
 };
+type RepositoryTests = {
+  status: string;
+  comparison: string;
+  baseline: unknown;
+  candidate: unknown;
+  test_comparison: Comparison | null;
+  provenance: {
+    test_paths: string[];
+    file_count: number;
+    test_suite_sha256: string;
+    baseline_sha: string;
+  } | null;
+  limitations: string[];
+  error_code?: string;
+};
 type Job = {
   id: string;
   status: string;
@@ -52,6 +69,8 @@ type Job = {
     test_integrity?: IntegrityResult | null;
     requirement_evidence?: RequirementEvidence;
     python_impact?: PythonImpact | null;
+    static_analysis?: StaticAnalysis | null;
+    repository_tests?: RepositoryTests | null;
   } | null;
 };
 type Report = {
@@ -102,6 +121,9 @@ const stages: Record<string, string> = {
   checkout: "Checking out both revisions",
   test_integrity: "Inspecting changes to test structure",
   repository_impact: "Inspecting Python imports and syntax",
+  static_analysis: "Comparing Ruff findings across revisions",
+  repository_tests_baseline: "Running frozen repository tests · baseline",
+  repository_tests_candidate: "Running frozen repository tests · candidate",
   visible_baseline: "Running visible checks · baseline",
   visible_candidate: "Running visible checks · candidate",
   hidden_baseline: "Running independent checks · baseline",
@@ -599,6 +621,16 @@ export function Verification({
                       {job.artifact.python_impact && (
                         <ImpactEvidence result={job.artifact.python_impact} />
                       )}
+                      {job.artifact.static_analysis && (
+                        <StaticAnalysisEvidence
+                          result={job.artifact.static_analysis}
+                        />
+                      )}
+                      {job.artifact.repository_tests && (
+                        <RepositoryTestEvidence
+                          result={job.artifact.repository_tests}
+                        />
+                      )}
                       {job.artifact.requirement_evidence && (
                         <Requirements
                           result={job.artifact.requirement_evidence}
@@ -693,7 +725,51 @@ export function Verification({
   );
 }
 
+function RepositoryTestEvidence({ result }: { result: RepositoryTests }) {
+  return (
+    <section className="suite-evidence">
+      <h3>Frozen repository tests</h3>
+      <p className="profile-coverage">
+        The same baseline tests run against both code revisions. These tests
+        share a process with repository code and do not determine the
+        independent verdict.
+      </p>
+      {result.provenance && (
+        <p>
+          {result.provenance.file_count} frozen files ·{" "}
+          <code>{result.provenance.test_paths.join(", ")}</code>
+        </p>
+      )}
+      {result.test_comparison ? (
+        <SuiteEvidence
+          name="repository"
+          suite={{
+            baseline: result.baseline,
+            candidate: result.candidate,
+            test_comparison: result.test_comparison,
+          }}
+        />
+      ) : (
+        <p className="execution-warning">
+          Repository test evidence unavailable.{" "}
+          {result.error_code && words(result.error_code)}
+        </p>
+      )}
+      <details className="evidence-details">
+        <summary>Repository test provenance & limits</summary>
+        <ul>
+          {result.limitations.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <pre>{JSON.stringify(result.provenance, null, 2)}</pre>
+      </details>
+    </section>
+  );
+}
+
 function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
+  const [shown, setShown] = useState(100);
   const comparison = suite.test_comparison;
   const rows = [
     ...comparison.regressions,
@@ -704,7 +780,13 @@ function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
   ];
   return (
     <section className="suite-evidence">
-      <h3>{name === "hidden" ? "Independent checks" : "Visible checks"}</h3>
+      <h3>
+        {name === "hidden"
+          ? "Independent checks"
+          : name === "repository"
+            ? "Repository test comparison"
+            : "Visible checks"}
+      </h3>
       <p>{verdicts[comparison.verdict] || words(comparison.verdict)}</p>
       <div className="comparison-counts">
         {[
@@ -736,7 +818,7 @@ function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.slice(0, shown).map((row) => (
                 <tr key={row.nodeid}>
                   <td>
                     <code>{row.nodeid}</code>
@@ -751,6 +833,15 @@ function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
           </table>
         </div>
       )}
+      {rows.length > shown && (
+        <button
+          className="button secondary"
+          onClick={() => setShown((value) => value + 100)}
+        >
+          Show next {Math.min(100, rows.length - shown)} checks ({shown} of{" "}
+          {rows.length} shown)
+        </button>
+      )}
       {["missing_tests", "added_tests"].map((category) => {
         const values = comparison[category as "missing_tests" | "added_tests"];
         return values.length ? (
@@ -762,8 +853,9 @@ function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
       <details className="evidence-details">
         <summary>Raw execution evidence & logs</summary>
         <p className="muted">
-          Candidate output is untrusted. Assertions were evaluated by the
-          external controller.
+          {name === "repository"
+            ? "Repository output is untrusted. Assertions and the report share a process with repository code."
+            : "Candidate output is untrusted. Assertions were evaluated by the external controller."}
         </p>
         <pre>
           {JSON.stringify(

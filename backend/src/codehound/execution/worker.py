@@ -20,6 +20,7 @@ from codehound.execution.docker import control
 from codehound.execution.impact import analyze_python_impact
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.integrity import analyze_test_integrity
+from codehound.execution.static_analysis import analyze_static
 from codehound.execution.verify import verify_snapshot
 from codehound.repositories.checkout import CheckoutFailure
 
@@ -66,6 +67,8 @@ async def execute_job(job, database, executor=verify_snapshot):
                 on_progress=progress,
                 integrity_analyzer=analyze_test_integrity,
                 impact_analyzer=analyze_python_impact,
+                static_analyzer=analyze_static,
+                repository_test_config=profile.repository_tests,
             )
     artifact["profile"] = profile.public()
     artifact["requirement_evidence"] = requirement_evidence(profile, artifact)

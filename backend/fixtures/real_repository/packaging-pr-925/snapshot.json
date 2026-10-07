@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-07T02:32:23.879983+00:00",
+  "repository": {
+    "id": 19837758,
+    "full_name": "pypa/packaging",
+    "private": false
+  },
+  "pull_request": {
+    "number": 925,
+    "title": "Correct regex for metadata 'name' format",
+    "body": "The current regex permits strings that end in the newline character, which is counter to what the description for the field states (\"ASCII letters and numbers, period, underscore and hyphen\").\r\n\r\nThis updates the regex to use `\\Z` instead of `$` to match at the end of the string and exclude newline characters.\r\n\r\nCorresponding update to the spec is here: https://github.com/pypa/packaging.python.org/pull/1898.",
+    "state": "closed",
+    "url": "https://github.com/pypa/packaging/pull/925"
+  },
+  "base_target_sha": "033854a05229074ddb191d67da1f8e0165e665da",
+  "base_sha": "033854a05229074ddb191d67da1f8e0165e665da",
+  "head_sha": "ca4e142149c04000c91c9f16642452e999ee04ba",
+  "head_repository": "di/packaging",
+  "base_ref": "main",
+  "head_ref": "update-name-validation-regex",
+  "files": [
+    {
+      "sha": "2246e9a067ddf1aa657f1a02aa2d79de5ab5e028",
+      "filename": "src/packaging/utils.py",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2,
+      "patch_available": true
+    },
+    {
+      "sha": "d19776a5b643415d9ffc58cdec45972ece36ccff",
+      "filename": "tests/test_utils.py",
+      "status": "modified",
+      "additions": 15,
+      "deletions": 3,
+      "changes": 18,
+      "patch_available": true
+    }
+  ],
+  "diff": "diff --git a/src/packaging/utils.py b/src/packaging/utils.py\nindex 23450953d..2246e9a06 100644\n--- a/src/packaging/utils.py\n+++ b/src/packaging/utils.py\n@@ -35,7 +35,7 @@ class InvalidSdistFilename(ValueError):\n \n # Core metadata spec for `Name`\n _validate_regex = re.compile(\n-    r\"^([A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$\", re.IGNORECASE\n+    r\"^([A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])\\Z\", re.IGNORECASE\n )\n _canonicalize_regex = re.compile(r\"[-_.]+\")\n _normalized_regex = re.compile(r\"^([a-z0-9]|[a-z0-9]([a-z0-9-](?!--))*[a-z0-9])$\")\ndiff --git a/tests/test_utils.py b/tests/test_utils.py\nindex a8cc8d71e..d19776a5b 100644\n--- a/tests/test_utils.py\n+++ b/tests/test_utils.py\n@@ -37,10 +37,22 @@ def test_canonicalize_name(name, expected):\n     assert canonicalize_name(name) == expected\n \n \n-def test_canonicalize_name_invalid():\n+@pytest.mark.parametrize(\n+    (\"name\", \"expected\"),\n+    [\n+        (\"_not_legal\", \"-not-legal\"),\n+        (\"hi\\n\", \"hi\\n\"),\n+        (\"\\nhi\", \"\\nhi\"),\n+        (\"h\\ni\", \"h\\ni\"),\n+        (\"hi\\r\", \"hi\\r\"),\n+        (\"\\rhi\", \"\\rhi\"),\n+        (\"h\\ri\", \"h\\ri\"),\n+    ],\n+)\n+def test_canonicalize_name_invalid(name, expected):\n     with pytest.raises(InvalidName):\n-        canonicalize_name(\"_not_legal\", validate=True)\n-    assert canonicalize_name(\"_not_legal\") == \"-not-legal\"\n+        canonicalize_name(name, validate=True)\n+    assert canonicalize_name(name) == expected\n \n \n @pytest.mark.parametrize(\n",
+  "diff_sha256": "342d9f02398c466f444d36268323a3a7d8b9d890e809bc1620b40c20c9243c90",
+  "summary": {
+    "files_changed": 2,
+    "additions": 16,
+    "deletions": 4
+  },
+  "observations": [
+    {
+      "kind": "test_file_changed",
+      "severity": "review",
+      "path": "tests/test_utils.py",
+      "message": "A test file changed; review assertion strength and coverage."
+    }
+  ],
+  "provenance": {
+    "kind": "historical_upstream_human_patch",
+    "author": "di",
+    "merged": true,
+    "merged_at": "2025-08-21T20:11:11Z",
+    "pull_metadata_url": "https://api.github.com/repos/pypa/packaging/pulls/925",
+    "pull_metadata_sha256": "4c589d56713006e11c7d4ebe5ac43a4b7f39236bbfd06eb75abc0b6d9d5684f4",
+    "pinned_comparison_url": "https://api.github.com/repos/pypa/packaging/compare/033854a05229074ddb191d67da1f8e0165e665da...ca4e142149c04000c91c9f16642452e999ee04ba",
+    "capture_method": "Operator-owned historical fixture assembled from public GitHub REST metadata and an immutable SHA comparison; open-PR intake was not used."
+  },
+  "limitations": [
+    "No repository code or tests have been executed during capture.",
+    "This historical upstream human-authored patch is an integration smoke example, not an agent benchmark or labeled negative dataset.",
+    "The HTTP intake API supports open PRs only; this operator-owned fixture preserves the actual closed state.",
+    "Filename-based integrity observations are review hints, not verdicts."
+  ]
+}

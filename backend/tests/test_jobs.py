@@ -228,6 +228,29 @@ def test_worker_uses_frozen_profile_and_exact_snapshot(ready, monkeypatch):
     assert final.artifact["profile"]["id"] == "test-profile"
 
 
+def test_worker_forwards_only_operator_repository_tests_config(ready, monkeypatch):
+    from codehound.execution.repository_tests import RepositoryTestConfig
+
+    _, identifier, store, profile = ready
+    config = RepositoryTestConfig(test_paths=["tests/test_values.py"], target_packages=["values"])
+    selected = profile.model_copy(update={"repository_tests": config})
+    store.enqueue(identifier, 123, selected, "sha256:" + "a" * 64)
+    job = store.claim()
+
+    async def docker(*args):
+        return 0, b"", b""
+
+    async def evaluate(snapshot, suites, runner, **kwargs):
+        assert kwargs["mode"] == "independent"
+        assert kwargs["repository_test_config"] == config
+        assert suites["visible"] == profile.visible
+        return artifact()
+
+    monkeypatch.setattr(worker, "control", docker)
+    result = asyncio.run(worker.execute_job(job, app.state.database, executor=evaluate))
+    assert result["profile"]["repository_tests"]["target_packages"] == ["values"]
+
+
 def test_worker_cancellation_waits_for_execution_cleanup(ready):
     _, _, store, _ = ready
     enqueue(ready)
