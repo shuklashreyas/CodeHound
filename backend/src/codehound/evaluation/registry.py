@@ -2,10 +2,11 @@
 
 import os
 import re
+import stat
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from codehound.execution.profiles import Contract, TrustedSuite
 from codehound.execution.repository_tests import RepositoryTestConfig
@@ -32,6 +33,14 @@ class EvaluationProfile(Contract):
     hidden: TrustedSuite | None = None
     repository_tests: RepositoryTestConfig | None = None
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
+    execution_image_id: str | None = Field(default=None, max_length=71)
+
+    @field_validator("execution_image_id")
+    @classmethod
+    def validate_image_id(cls, value):
+        if value is not None and not re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+            raise ValueError("Execution images must be immutable lowercase SHA-256 IDs.")
+        return value
 
     @model_validator(mode="after")
     def validate_repository(self):
@@ -77,21 +86,45 @@ class EvaluationProfile(Contract):
         }
 
 
-def configured_image():
+def configured_image(profile: EvaluationProfile | None = None):
+    if profile is not None and profile.execution_image_id is not None:
+        return profile.execution_image_id
     image = os.getenv("CODEHOUND_EXECUTION_IMAGE_ID", "")
     return image if re.fullmatch(r"sha256:[0-9a-f]{64}", image) else None
 
 
+def read_profile(path):
+    """Open the retained file once; never follow links or read special files."""
+    limit = 128 * 1024
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > limit:
+            raise ValueError("Invalid operator profile file.")
+        raw = bytearray()
+        while len(raw) <= limit:
+            chunk = os.read(descriptor, min(65536, limit + 1 - len(raw)))
+            if not chunk:
+                break
+            raw.extend(chunk)
+        if len(raw) > limit:
+            raise ValueError("Operator profile exceeds 128 KiB.")
+        return bytes(raw)
+    finally:
+        os.close(descriptor)
+
+
 def load_profiles():
     directory = Path(os.getenv("CODEHOUND_PROFILE_DIR", str(Path(__file__).parent / "profiles")))
-    paths = sorted(directory.glob("*.json"))
-    if len(paths) > 50:
-        raise ValueError("At most 50 operator profiles are supported.")
+    paths = []
+    for path in directory.glob("*.json"):
+        paths.append(path)
+        if len(paths) > 50:
+            raise ValueError("At most 50 operator profiles are supported.")
+    paths.sort()
     profiles = {}
     for path in paths:
-        if path.is_symlink() or path.stat().st_size > 128 * 1024:
-            raise ValueError("Invalid operator profile file.")
-        profile = EvaluationProfile.model_validate_json(path.read_bytes())
+        profile = EvaluationProfile.model_validate_json(read_profile(path))
         if profile.id in profiles:
             raise ValueError("Duplicate operator profile ID.")
         profiles[profile.id] = profile

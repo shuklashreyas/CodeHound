@@ -41,14 +41,18 @@ def available_profiles(
     record = records.get(str(identifier), login["user"]["id"])
     if record is None:
         raise HTTPException(404, "Verification not found.")
-    matched = [
-        profile.public()
-        for profile in profiles().values()
-        if profile.repository.casefold() == record.repository.casefold()
-    ]
+    matched = []
+    for profile in profiles().values():
+        if profile.repository.casefold() == record.repository.casefold():
+            image = configured_image(profile)
+            matched.append(
+                profile.public()
+                | {"execution_configured": image is not None, "execution_image_id": image}
+            )
     return {
         "profiles": matched,
-        "configured": configured_image() is not None,
+        "configured": configured_image() is not None
+        or any(profile["execution_configured"] for profile in matched),
         "worker_online": queue.worker_online(),
     }
 
@@ -71,12 +75,14 @@ def enqueue(
 ):
     if records.get(str(identifier), login["user"]["id"]) is None:
         raise HTTPException(404, "Verification not found.")
-    image = configured_image()
-    if image is None:
-        raise HTTPException(503, "A trusted execution image has not been configured.")
     profile = profiles().get(submission.profile_id)
     if profile is None:
         raise HTTPException(422, "Select an available operator-owned test profile.")
+    image = configured_image(profile)
+    if image is None:
+        raise HTTPException(
+            503, "A trusted execution image has not been configured for this profile."
+        )
     require_mutation_limit(request, login["user"]["id"])
     try:
         job, created = queue.enqueue(

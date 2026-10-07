@@ -262,6 +262,63 @@ it("explains unavailable image and offline worker without manufacturing a verdic
   expect(screen.queryByText("Improvement observed")).toBeNull();
 });
 
+it("chooses a configured profile and disables an unavailable choice despite aggregate availability", async () => {
+  const pinned = {
+    ...profile,
+    id: "pinned-profile",
+    label: "Pinned runtime profile",
+    execution_configured: true,
+    execution_image_id: "sha256:" + "b".repeat(64),
+  };
+  harness({
+    report: { ...draft, status: "ready", snapshot },
+    profiles: {
+      configured: true,
+      worker_online: true,
+      profiles: [{ ...profile, execution_configured: false }, pinned],
+    },
+  });
+  render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+  const selector = await screen.findByRole("combobox", {
+    name: "Independent test profile",
+  });
+  await waitFor(() => {
+    expect((selector as HTMLSelectElement).value).toBe("pinned-profile");
+  });
+  const run = screen.getByRole("button", { name: "Run verification" });
+  expect((run as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.change(selector, { target: { value: profile.id } });
+  expect((run as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText(/Execution image is not configured for this profile/)).toBeTruthy();
+  fireEvent.change(selector, { target: { value: pinned.id } });
+  expect((run as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.queryByText(/Execution image is not configured/)).toBeNull();
+});
+
+it("uses explicit profile availability and sends only the selected profile ID", async () => {
+  const requests: unknown[] = [];
+  const pinned = {
+    ...profile,
+    execution_configured: true,
+    execution_image_id: "sha256:" + "b".repeat(64),
+  };
+  vi.stubGlobal("fetch", vi.fn((path: string, options?: RequestInit) => {
+    if (options?.method === "POST") {
+      requests.push(JSON.parse(options.body as string));
+      return response(queued, 202);
+    }
+    if (path.endsWith("/profiles"))
+      return response({ configured: false, worker_online: true, profiles: [pinned] });
+    if (path.endsWith("/executions")) return response([]);
+    return response({ ...draft, status: "ready", snapshot });
+  }));
+  render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+  const run = await screen.findByRole("button", { name: "Run verification" });
+  await waitFor(() => expect((run as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(run);
+  await waitFor(() => expect(requests).toEqual([{ profile_id: profile.id }]));
+});
+
 it.each([false, true])(
   "shows independent regression evidence (partial=%s)",
   async (partial) => {

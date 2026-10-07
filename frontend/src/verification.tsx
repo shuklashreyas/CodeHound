@@ -15,6 +15,8 @@ type Profile = {
   coverage: string;
   visible_cases: number;
   hidden_cases: number;
+  execution_configured?: boolean;
+  execution_image_id?: string | null;
 };
 type Failure = { code: string; message: string };
 type Transition = { nodeid: string; before: string; after: string };
@@ -216,7 +218,9 @@ export function Verification({
         setProfileId((previous) =>
           profiles.profiles.some((p) => p.id === previous)
             ? previous
-            : profiles.profiles[0]?.id || "",
+            : profiles.profiles.find(
+                (p) => p.execution_configured ?? profiles.configured,
+              )?.id || profiles.profiles[0]?.id || "",
         );
         if (next.status === "intaking" || history.some(active))
           timer = setTimeout(() => void load(), 2000);
@@ -308,6 +312,8 @@ export function Verification({
     );
   }
   const profile = availability?.profiles.find((p) => p.id === profileId);
+  const executionConfigured =
+    profile?.execution_configured ?? availability?.configured ?? false;
   const running = jobs.find(active);
   return (
     <div className="live-verification">
@@ -472,9 +478,9 @@ export function Verification({
                     operator must supply independent checks before it can run.
                   </p>
                 )}
-                {availability && !availability.configured && (
+                {profile && !executionConfigured && (
                   <p className="execution-warning">
-                    Execution image is not configured on the backend.
+                    Execution image is not configured for this profile.
                   </p>
                 )}
                 {availability && !availability.worker_online && (
@@ -492,8 +498,8 @@ export function Verification({
                     !!running ||
                     report.status !== "ready" ||
                     !profile ||
-                    !availability?.configured ||
-                    !availability.worker_online
+                    !executionConfigured ||
+                    !availability?.worker_online
                   }
                   onClick={run}
                 >

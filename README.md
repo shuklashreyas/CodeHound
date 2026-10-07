@@ -33,6 +33,8 @@ execution, hidden tests, patch integrity checks, and repository context.
   findings while ignoring candidate configuration. Incomplete scans stay inconclusive.
 - **Existing repository tests:** operator-selected baseline pytest inputs are frozen
   and run against both revisions as explicitly lower-trust evidence.
+- **Per-profile environments:** operator profiles can pin separate immutable Docker
+  image IDs for repository dependencies, with the configured global image as fallback.
 - **Real repository examples:** three pinned upstream fixes across `pypa/packaging`
   and `mahmoud/boltons`, with independent behavioral contracts and frozen baseline tests.
 - **Incorrect patch demonstration:** two deliberate packaging mutations pass visible

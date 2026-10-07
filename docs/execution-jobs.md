@@ -50,6 +50,30 @@ profile, image ID, and commit/diff identities when a job is queued. Profile bodi
 and expected answers are never returned by API serializers. Optional requirement
 mappings are described in [requirement-evidence.md](requirement-evidence.md).
 
+Profiles can optionally set `execution_image_id` to an immutable local image ID
+in the form `sha256:` followed by 64 lowercase hexadecimal characters. This
+operator-owned pin takes precedence over `CODEHOUND_EXECUTION_IMAGE_ID`; profiles
+without a pin (or with JSON `null`) retain that global fallback. Empty strings,
+image tags, registry URLs, and malformed IDs fail profile validation. Operators
+can therefore select different prepared Python/dependency environments for
+different profiles without changing a global setting. Candidate repositories and
+API request bodies cannot supply image IDs or build instructions.
+
+Each profile availability response includes `execution_configured` and the
+resolved `execution_image_id`. These describe current operator configuration;
+they do not establish that the image exists on the worker's Docker daemon. The
+worker checks local image presence when it starts the job. The browser enables
+execution for the selected profile only. The older top-level `configured` flag
+remains true when the global image is configured or a compatible profile has a
+pin, and must not be used to infer availability of every profile.
+
+The queued job's stored image ID and profile snapshot remain authoritative after
+operator files or environment settings change. Historical profile summaries stay
+independent of current availability; the job's separate `image_id` records the
+environment selected for that execution. Pre-existing jobs and profiles without
+the optional field remain valid. No candidate builds or dependency installation
+are added by this setting.
+
 ## API
 
 All routes require a GitHub session; writes also require `X-CodeHound-Request: 1`

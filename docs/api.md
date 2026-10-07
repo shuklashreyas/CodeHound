@@ -81,6 +81,14 @@ No check is assigned `pass` by intake. `confidence` stays null and
 `execution_status` starts as `not_run`; queued execution updates it independently
 of intake state. See [execution jobs](execution-jobs.md) for the evaluator API.
 
+Compatible profile summaries returned by `GET /api/verifications/{id}/profiles`
+include current `execution_configured` and resolved `execution_image_id` values
+for each choice. A profile's optional operator-owned image pin overrides the
+global fallback. Configuration is separate from worker presence and local image
+availability. Execution creation still accepts only `profile_id`; the selected
+image is frozen in the queued job and cannot be overridden by the caller.
+Historical job profile summaries do not include current availability fields.
+
 ## Storage and exports
 
 SQLite supports local development; Compose uses PostgreSQL. Alembic migrations run
