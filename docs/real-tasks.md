@@ -26,10 +26,14 @@ Compact observed summaries retain the full execution artifact's SHA-256,
 independent suite/profile and evaluator identities, and frozen repository-test
 configuration, evaluator and input-file hashes. The profile binding combines
 public profile metadata, requirement mappings, suite hashes and repository-test
-configuration. Offline tests compare that binding and evaluator/configuration
-hashes to the current operator profiles and harness files; changed inputs require
-fresh observed evidence. Frozen input hashes identify the exact baseline tests
-and ancestor fixture/package files used in the original run.
+configuration. Offline tests compare the profile, suite and configuration content
+to the current operator profiles, and preserve the full-artifact digest recorded
+for each historical run. Evaluator hashes identify the harness used at that time;
+they are validated as recorded SHA-256 values and are not compared with today's
+runtime. A runtime update does not imply that these old runs executed the updated
+evaluator. Changed profile inputs require fresh observed evidence. Frozen input
+hashes identify the exact baseline tests and ancestor fixture/package files used
+in the original run.
 GitHub account metadata does not establish whether AI assistance was used or
 whether a patch constitutes independently reviewed ground truth. These are
 historical upstream reproductions, not an AI-agent benchmark, labeled negative

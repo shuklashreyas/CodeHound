@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from pydantic import JsonValue, TypeAdapter
 
+from codehound.execution.deadlines import SUITE_CLEANUP_SECONDS, current_budget
 from codehound.execution.docker import ContainerRunner, ExecutionResult
 from codehound.execution.profiles import TrustedSuite
 from codehound.execution.protocol import load_evidence
@@ -138,6 +139,7 @@ class IndependentRunner(ContainerRunner):
             Path(__file__).read_bytes()
             + (Path(__file__).parent / "adapters" / "call_adapter.py").read_bytes()
             + (Path(__file__).parent / "protocol.py").read_bytes()
+            + (Path(__file__).parent / "deadlines.py").read_bytes()
             + profile.canonical_bytes()
         ).hexdigest()
         runner = IndependentRunner(
@@ -148,9 +150,18 @@ class IndependentRunner(ContainerRunner):
         started = time.monotonic()
         tests, evidence = [], []
         status = "completed"
+        budget = current_budget()
+        timeout = profile.suite_timeout_seconds
+        if budget is not None:
+            timeout = min(timeout, budget.remaining(reserve=SUITE_CLEANUP_SECONDS))
+        timer = asyncio.timeout(timeout)
         try:
-            async with asyncio.timeout(profile.suite_timeout_seconds):
+            async with timer:
                 for case in profile.cases:
+                    # An already exhausted budget must not start another container.
+                    if timeout == 0:
+                        status = "timeout"
+                        break
                     observation = await runner.observe(workspace, profile, case)
                     outcome, message = judge(case, observation)
                     tests.append(
@@ -163,14 +174,23 @@ class IndependentRunner(ContainerRunner):
                     )
                     evidence.append({"case_id": case.id, "observation": observation.to_dict()})
         except TimeoutError:
+            if not timer.expired():
+                raise
             status = "timeout"
+        budget_exhausted = (
+            budget is not None and status == "timeout" and (timeout < profile.suite_timeout_seconds)
+        )
+        if budget_exhausted:
+            budget.incomplete("independent_suite:" + profile.name)
         completed = len(tests)
         tests.extend(
             {
                 "nodeid": profile.name + "::" + case.id,
                 "outcome": "not_run",
                 "duration_seconds": 0,
-                "message": "Suite deadline exceeded.",
+                "message": "Execution work budget exceeded."
+                if budget_exhausted
+                else "Suite deadline exceeded.",
             }
             for case in profile.cases[completed:]
         )
@@ -191,7 +211,7 @@ class IndependentRunner(ContainerRunner):
             self.image_id,
             False,
             False,
-            profile.suite_timeout_seconds,
+            timeout,
             test_report=report,
             evaluator_sha256=evaluator,
             evidence_source="external_json_assertions",

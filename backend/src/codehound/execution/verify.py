@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from codehound.execution.deadlines import current_budget, optional_stage
 from codehound.execution.docker import DockerRunner
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.profiles import TrustedSuite
@@ -13,6 +14,85 @@ from codehound.execution.repository_tests import RepositoryTestConfig, run_repos
 from codehound.execution.results import compare_tests, summarize_comparisons
 from codehound.repositories.checkout import GitWorkspace
 from codehound.repositories.urls import parse_pull_url
+
+DEADLINE_REASON = "execution_work_budget_exceeded"
+
+
+def incomplete_inspection(stage, image_id):
+    """Keep timed-out optional evidence explicit and compatible with evidence consumers."""
+    limitation = "Execution work budget exceeded; this stage was not fully inspected."
+    common = {"status": "inconclusive", "image_id": image_id, "limitations": [limitation]}
+    if stage == "test_integrity":
+        return common | {
+            "files_examined": 0,
+            "findings": [],
+            "unverified": [{"revision": "both", "reason": DEADLINE_REASON}],
+        }
+    if stage == "repository_impact":
+        return common | {
+            "revisions": {},
+            "new_syntax_errors": [],
+            "unverified": [{"revision": "both", "path": "", "reason": DEADLINE_REASON}],
+            "unverified_count": 1,
+        }
+    if stage == "static_analysis":
+        from codehound.execution.static_analysis import CONFIG_SHA256, LIMITS, VERSION
+
+        def revision():
+            return {
+                "status": "inconclusive",
+                "files": [],
+                "findings": [],
+                "skipped_files": [],
+                "errors": [DEADLINE_REASON],
+                "source_bytes": 0,
+            }
+
+        sources = [
+            Path(__file__).parent / "static_analysis.py",
+            Path(__file__).parent / "inspection" / "static_ruff.py",
+        ]
+        return common | {
+            "tool": {
+                "name": "ruff",
+                "version": VERSION,
+                "rules": ["E", "F"],
+                "config_sha256": CONFIG_SHA256,
+            },
+            "evaluator_sha256": hashlib.sha256(
+                b"".join(path.read_bytes() for path in sources)
+            ).hexdigest(),
+            "baseline": revision(),
+            "candidate": revision(),
+            "new": [],
+            "resolved": [],
+            "existing": [],
+            "counts": {"new": 0, "resolved": 0, "existing": 0},
+            "coverage": {
+                "baseline_files": 0,
+                "candidate_files": 0,
+                "excluded_directories": [".git"],
+                "comparison_complete": False,
+            },
+            "limits": LIMITS,
+        }
+    if stage == "repository_tests":
+        from codehound.execution.repository_tests import LIMITATIONS, SOURCE
+
+        return common | {
+            "mode": "frozen_baseline",
+            "trust": "repository_controlled",
+            "evidence_source": SOURCE,
+            "affects_assessment": False,
+            "provenance": None,
+            "baseline": None,
+            "candidate": None,
+            "comparison": "inconclusive",
+            "test_comparison": None,
+            "error_code": DEADLINE_REASON,
+            "limitations": [*LIMITATIONS, limitation],
+        }
+    raise ValueError("Unknown optional inspection stage.")
 
 
 def suite_digest(directory: Path):
@@ -96,23 +176,36 @@ async def verify_snapshot(
     impact = None
     static = None
     repository_tests = None
+    budget = current_budget()
     if on_progress:
         await on_progress("checkout")
     async with workspace_factory(
         reference.repository, snapshot["base_sha"], snapshot["head_sha"]
     ) as checkouts:
-        if integrity_analyzer is not None:
-            if on_progress:
-                await on_progress("test_integrity")
-            integrity = await integrity_analyzer(snapshot, checkouts, runner.image_id)
-        if impact_analyzer is not None:
-            if on_progress:
-                await on_progress("repository_impact")
-            impact = await impact_analyzer(snapshot, checkouts, runner.image_id)
-        if static_analyzer is not None:
-            if on_progress:
-                await on_progress("static_analysis")
-            static = await static_analyzer(snapshot, checkouts, runner.image_id)
+
+        async def inspections():
+            evidence = []
+            for stage, analyzer in (
+                ("test_integrity", integrity_analyzer),
+                ("repository_impact", impact_analyzer),
+                ("static_analysis", static_analyzer),
+            ):
+                result = None
+                if analyzer is not None:
+                    if on_progress:
+                        await on_progress(stage)
+                    result = await optional_stage(
+                        stage,
+                        lambda: analyzer(snapshot, checkouts, runner.image_id),
+                        lambda: incomplete_inspection(stage, runner.image_id),
+                    )
+                evidence.append(result)
+            return evidence
+
+        # Standalone callers retain their original order and suite limits. Workers
+        # prioritize independent evidence before spending their optional-stage budget.
+        if budget is None:
+            integrity, impact, static = await inspections()
         for name, tests in suites.items():
             if on_progress:
                 await on_progress(f"{name}_baseline")
@@ -129,15 +222,21 @@ async def verify_snapshot(
                 "comparison": comparison(baseline, candidate),
                 "test_comparison": compare_tests(baseline, candidate),
             }
+        if budget is not None:
+            integrity, impact, static = await inspections()
         if repository_test_config is not None:
-            repository_tests = await run_repository_tests(
-                checkouts,
-                repository_test_config,
-                runner.image_id,
-                runner=repository_test_runner,
-                on_progress=on_progress,
+            repository_tests = await optional_stage(
+                "repository_tests",
+                lambda: run_repository_tests(
+                    checkouts,
+                    repository_test_config,
+                    runner.image_id,
+                    runner=repository_test_runner,
+                    on_progress=on_progress,
+                ),
+                lambda: incomplete_inspection("repository_tests", runner.image_id),
             )
-    return {
+    artifact = {
         "schema_version": 2,
         "evaluation_mode": mode,
         "pr_url": reference.url,
@@ -162,6 +261,14 @@ async def verify_snapshot(
             "Repository dependencies must already be present in the trusted image.",
         ],
     }
+    if budget is not None:
+        artifact["execution_budget"] = budget.to_dict()
+        if budget.incomplete_stages:
+            artifact["limitations"].append(
+                "Execution work budget exceeded. Completed independent observations are retained; "
+                "unfinished cases and optional stages remain unverified."
+            )
+    return artifact
 
 
 def main():

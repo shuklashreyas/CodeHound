@@ -71,6 +71,11 @@ type Job = {
     python_impact?: PythonImpact | null;
     static_analysis?: StaticAnalysis | null;
     repository_tests?: RepositoryTests | null;
+    execution_budget?: {
+      status: "completed" | "exhausted";
+      work_timeout_seconds: number;
+      incomplete_stages: string[];
+    };
   } | null;
 };
 type Report = {
@@ -590,6 +595,20 @@ export function Verification({
                         {job.failure.message}
                       </p>
                     )}
+                    {job.artifact?.execution_budget?.status === "exhausted" && (
+                      <div className="execution-warning" role="status">
+                        <strong>Time limit reached; completed evidence retained.</strong>
+                        <p>
+                          Some checks could not finish within the execution budget.
+                          Their untested behavior remains unverified.
+                        </p>
+                        <p>
+                          Incomplete: {job.artifact.execution_budget.incomplete_stages
+                            .map((stage) => words(stage.replaceAll(":", " ")))
+                            .join(", ")}.
+                        </p>
+                      </div>
+                    )}
                     {job.status === "cancelled" && (
                       <p>
                         This execution was cancelled. No verdict was issued.
@@ -795,7 +814,15 @@ function SuiteEvidence({ name, suite }: { name: string; suite: Suite }) {
             ? "Repository test comparison"
             : "Visible checks"}
       </h3>
-      <p>{verdicts[comparison.verdict] || words(comparison.verdict)}</p>
+      <p>
+        {comparison.verdict === "incomplete"
+          ? name === "repository"
+            ? "Repository tests still fail"
+            : name === "hidden"
+              ? "Independent checks still fail"
+              : "Visible checks still fail"
+          : verdicts[comparison.verdict] || words(comparison.verdict)}
+      </p>
       <div className="comparison-counts">
         {[
           "improvements",

@@ -77,7 +77,8 @@ backlog bounds, not request-rate or disk quotas. Another account receives 404 fo
 all detail, list, cancel, profile, and export routes.
 
 Jobs move through `queued → running → completed/failed/cancelled`. `completed`
-means the evaluator finished, not that the patch passed. Its assessment can still
+means an evidence artifact was stored, not that the patch passed or every stage finished.
+Its assessment can still
 be incomplete, inconclusive, or a regression. Setup failures preserve a sanitized
 reason. Completed evidence is immutable; a retry creates another job.
 
@@ -86,7 +87,10 @@ failed on the next worker poll, release the active-job slot, and cannot be
 resurrected by late results. Cancellation wins over a concurrent completion and
 clears any candidate artifact. Running cancellation is checked every five seconds;
 Docker cleanup finishes before the worker records cancellation. Each evaluation
-has a 600-second total deadline in addition to suite and case limits.
+has a 560-second work budget within a 600-second hard deadline, in addition to suite
+and case limits. Independent suites run before optional inspections. Exhausted
+optional stages become inconclusive while completed independent evidence is saved;
+unfinished independent cases remain `not_run`. See [deadline handling](execution-deadlines.md).
 
 Verification detail/export now includes the latest execution summary. Configured
 visible/independent checks can have actual pass/fail/inconclusive outcomes. Task
@@ -97,8 +101,10 @@ global safety guarantee.
 
 ## Operational limits
 
-Sessions remain process-local, so run one API worker. The queue can use multiple
-execution workers, each processing one job at a time. Dedicated disk quotas,
-request-rate and storage quotas, and deployment hardening are still required before public
+Default sessions are process-local; use one API process or configure
+[encrypted shared sessions](shared-sessions.md). The queue can use multiple
+execution workers, each processing one job at a time. [Request limits](request-limits.md)
+bound login and mutation admission. Dedicated disk quotas and deployment hardening
+are still required before public
 production use. Claim-aware [orphan recovery](worker-recovery.md) now handles aged
 resources owned by expired jobs; it is not a storage quota.

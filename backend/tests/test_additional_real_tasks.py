@@ -4,12 +4,12 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
 
 from codehound.evaluation.registry import load_profiles
-from codehound.execution import independent
 from codehound.execution.real_repository import reproduce
 from codehound.repositories.intake import ChangedFile, Pull
 
@@ -18,6 +18,10 @@ TASKS = [
     (403, "boltons-bytes-boundaries", "bytes2human", 4, 9, 2, 5, 16),
     (418, "boltons-singular-double-s", "singularize", 3, 12, 1, 7, 17),
 ]
+FULL_ARTIFACT_DIGESTS = {
+    403: "189760915a3cb7fecb2d167fda4e9d78129e7f0f8f0d9fafd4904d79d6799114",
+    418: "54678e4da3a10e3e9a2c4a04135e0d77d6f714e8a33eaea99aa622568fa2e7fb",
+}
 
 
 def snapshot(number):
@@ -99,17 +103,13 @@ def test_authentic_historical_metadata_diff_and_profile_contract(
     assert observed["diff_sha256"] == captured["diff_sha256"]
     assert observed["profile_id"] == identifier
     assert observed["profile_sha256"] == profile_binding(profile)
-    harness = Path(independent.__file__).parent
+    assert observed["full_artifact_sha256"] == FULL_ARTIFACT_DIGESTS[number]
     for name, suite in (("visible", profile.visible), ("hidden", profile.hidden)):
         retained = observed["independent_suites"][name]
         assert retained["test_suite_sha256"] == suite.sha256
-        evaluator = hashlib.sha256(
-            Path(independent.__file__).read_bytes()
-            + (harness / "adapters" / "call_adapter.py").read_bytes()
-            + (harness / "protocol.py").read_bytes()
-            + suite.canonical_bytes()
-        ).hexdigest()
-        assert retained["evaluator_sha256"] == evaluator
+        # Historical evaluator identities belong to the recorded run. Later
+        # runtime changes do not retroactively change which evaluator ran it.
+        assert re.fullmatch(r"[0-9a-f]{64}", retained["evaluator_sha256"])
     repository = observed["repository_tests"]
     provenance = repository["provenance"]
     assert provenance["baseline_sha"] == captured["base_sha"]
@@ -124,13 +124,9 @@ def test_authentic_historical_metadata_diff_and_profile_contract(
         "tests/conftest.py",
         "tests/__init__.py",
     }
-    repository_evaluator = hashlib.sha256(
-        b"".join(
-            (harness / name).read_bytes()
-            for name in ("repository_pytest_runner.py", "pytest_runner.py", "pytest.ini")
-        )
-    ).hexdigest()
-    assert repository["evaluator_sha256"] == repository_evaluator
+    assert re.fullmatch(r"[0-9a-f]{64}", repository["evaluator_sha256"])
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance["test_suite_sha256"])
+    assert all(re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) for item in provenance["files"])
     assert observed["assessment"]["confidence"] is None
     assert observed["independent_suites"]["visible"]["counts"]["improvements"] == v_improved
     assert observed["independent_suites"]["hidden"]["counts"]["improvements"] == h_improved

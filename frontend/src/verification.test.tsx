@@ -95,6 +95,74 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("distinguishes retained evidence from checks that exhausted the time budget", async () => {
+  const completed = {
+    ...queued,
+    status: "completed",
+    stage: "completed",
+    assessment: { verdict: "candidate_improves", signals: [] },
+    artifact: {
+      suites: {},
+      limitations: [],
+      execution_budget: {
+        status: "exhausted",
+        work_timeout_seconds: 560,
+        incomplete_stages: ["static_analysis", "repository_tests"],
+      },
+    },
+  };
+  harness({
+    report: { ...draft, status: "ready", snapshot },
+    jobs: [completed],
+    detail: completed,
+  });
+  render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+  await screen.findByText("Time limit reached; completed evidence retained.");
+  expect(screen.getByText(/Incomplete: static analysis, repository tests/)).toBeTruthy();
+  expect(screen.getByText(/Their untested behavior remains unverified/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Export execution" })).toBeTruthy();
+});
+
+it("does not label repository test failures as independent check failures", async () => {
+  const completed = {
+    ...queued,
+    status: "completed",
+    stage: "completed",
+    assessment: { verdict: "candidate_improves", signals: [] },
+    artifact: {
+      suites: {},
+      limitations: [],
+      repository_tests: {
+        status: "completed",
+        provenance: null,
+        baseline: null,
+        candidate: null,
+        limitations: ["Repository tests do not determine the independent verdict."],
+        test_comparison: {
+          verdict: "incomplete",
+          counts: { unresolved: 1 },
+          reasons: [],
+          improvements: [],
+          regressions: [],
+          unresolved: [{ nodeid: "test_existing", before: "failed", after: "failed" }],
+          missing_tests: [],
+          added_tests: [],
+          unverified: [],
+          unchanged_passes: [],
+        },
+      },
+    },
+  };
+  harness({
+    report: { ...draft, status: "ready", snapshot },
+    jobs: [completed],
+    detail: completed,
+  });
+  render(<Verification id="v1" onUnauthorized={vi.fn()} />);
+  await screen.findByText("Repository tests still fail");
+  expect(screen.queryByText("Independent checks still fail")).toBeNull();
+});
+
 it("captures an immutable snapshot before enabling execution", async () => {
   let captured = false;
   const fetch = vi.fn((path: string, options?: RequestInit) => {

@@ -16,6 +16,7 @@ from codehound.db.store import StoreConflict, VerificationStore
 from codehound.evaluation.registry import EvaluationProfile
 from codehound.evaluation.requirements import requirement_evidence
 from codehound.execution.cleanup import reconcile
+from codehound.execution.deadlines import HARD_TIMEOUT_SECONDS, execution_budget
 from codehound.execution.docker import control
 from codehound.execution.impact import analyze_python_impact
 from codehound.execution.independent import IndependentRunner
@@ -57,8 +58,11 @@ async def execute_job(job, database, executor=verify_snapshot):
         await run_in_threadpool(store.progress, job.id, job.claim_token, stage)
 
     namespace = await run_in_threadpool(store.namespace)
-    with execution_scope(ExecutionScope(namespace, job.id, job.claim_token)):
-        async with asyncio.timeout(600):
+    with (
+        execution_scope(ExecutionScope(namespace, job.id, job.claim_token)),
+        execution_budget(),
+    ):
+        async with asyncio.timeout(HARD_TIMEOUT_SECONDS):
             artifact = await executor(
                 snapshot,
                 suites,
