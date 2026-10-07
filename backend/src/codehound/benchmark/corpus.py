@@ -11,6 +11,9 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
 
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,159}$")]

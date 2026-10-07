@@ -1,6 +1,9 @@
 """Label-aware scoring, including abstentions and conditional detection denominators."""
 
+from codehound.execution.provenance import bind_source
 from codehound.execution.results import validate_report
+
+_SOURCE_BINDING = bind_source(__file__)
 
 
 def visible_decision(run):

@@ -18,6 +18,9 @@ from codehound.benchmark.corpus import (
     read_retained_file,
     strict_json,
 )
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
 
 ATTESTATION = "I personally reviewed this patch against the task."
 FailureCategory = Literal[
