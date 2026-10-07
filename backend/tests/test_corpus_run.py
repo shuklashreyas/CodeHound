@@ -575,3 +575,19 @@ def test_legitimate_static_inconclusive_remains_abstention(inputs):
     record["rows"][0]["static_analysis"].update(status="inconclusive")
     record["rows"][0]["decisions"]["static_only"] = "abstain"
     assert validate(record, inputs)[0]["decisions"]["static_only"] == "abstain"
+
+
+def test_empty_required_repository_stage_rejected_unavailable_allowed(inputs):
+    path = inputs[1]
+    config = json.loads(path.read_text())
+    config["tasks"][0]["repository_tests"] = {"test_paths": ["tests"]}
+    path.write_text(json.dumps(config))
+
+    async def unavailable(checkouts, frozen, image):
+        return {"status": "unavailable", "provenance": {"configuration_sha256": frozen.sha256}}
+
+    record = run(inputs, repository_analyzer=unavailable)
+    assert validate(record, inputs)[0]["decisions"]["repository_tests_only"] == "abstain"
+    record["rows"][0]["repository_tests"] = {}
+    with pytest.raises(ValueError, match="status-bearing"):
+        validate(record, inputs)
