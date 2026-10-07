@@ -145,6 +145,12 @@ def validated_record(record, corpus_sha, prepared, specification, mapping_sha, a
         if not isinstance(observations, dict) or set(observations) - {"baseline", "candidate"}:
             raise ValueError("Unexpected paired observation inventory.")
         supported = profile is not None and profile.supported
+        if (
+            profile is not None
+            and not profile.supported
+            and row.get("reason") != profile.unsupported_reason
+        ):
+            raise ValueError("Unsupported row reason differs from the frozen profile.")
         if not supported and (observations or row.get("comparison") is not None):
             raise ValueError("Unsupported profile cannot supply execution evidence.")
         checked = (
@@ -191,6 +197,7 @@ def report(corpus_path, manifest_path, reviews_path):
             "status": "abstained",
             "reason": "no_supported_task_profile",
             "decisions": {"task_behavior": "abstain"},
+            "unsupported_profile_reasons": [],
         }
         for item in prepared
     }
@@ -214,7 +221,22 @@ def report(corpus_path, manifest_path, reviews_path):
                 if row["case_id"] in ownership:
                     raise ValueError("Overlapping supported experiments cannot be cherry-picked.")
                 ownership.add(row["case_id"])
-                merged[row["case_id"]] = row
+                reasons = merged[row["case_id"]]["unsupported_profile_reasons"]
+                merged[row["case_id"]] = row | {"unsupported_profile_reasons": reasons}
+            elif profile is not None:
+                previous = merged[row["case_id"]]
+                reasons = previous["unsupported_profile_reasons"] + [
+                    {
+                        "reason": profile.unsupported_reason,
+                        "profile_authorship": profile.authorship.model_dump(mode="json"),
+                        "mapping_sha256": mapping_sha,
+                        "evidence_sha256": hashlib.sha256(raw).hexdigest(),
+                    }
+                ]
+                if row["case_id"] not in ownership and not previous["unsupported_profile_reasons"]:
+                    merged[row["case_id"]] = row | {"unsupported_profile_reasons": reasons}
+                else:
+                    previous["unsupported_profile_reasons"] = reasons
         inputs.append(
             {
                 "evidence": str(entry["evidence"]),

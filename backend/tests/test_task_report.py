@@ -235,3 +235,85 @@ def test_actual_retained_human_review_only_changes_posthoc_accuracy(artifacts):
         result["metrics"]["case_analyses"]["false_negatives"][0]["case_id"] == prepared[0].case.id
     )
     assert result["rows"][1]["label"] == "unreviewed"
+
+
+def unsupported_entry(artifacts, index, *, reason="requires unavailable network service"):
+    from hashlib import sha256
+    from pathlib import Path
+
+    entry = artifacts[3][index]
+    path = Path(entry["mapping"])
+    specification = json.loads(path.read_text())
+    profile = specification["tasks"][0]
+    profile.update(supported=False, unsupported_reason=reason, expected={})
+    profile["authorship"]["timing"] = "post_patch"
+    path.write_text(json.dumps(specification))
+    evidence = Path(entry["evidence"])
+    record = json.loads(evidence.read_text())
+    record["mapping_sha256"] = sha256(path.read_bytes()).hexdigest()
+    row = record["rows"][index]
+    row.update(
+        status="abstained",
+        reason=reason,
+        observations={},
+        profile_authorship=profile["authorship"],
+        decisions={"task_behavior": "abstain"},
+    )
+    row.pop("comparison", None)
+    evidence.write_text(json.dumps(record))
+    return entry
+
+
+def test_explicit_unsupported_profile_retains_reason_and_timing(artifacts):
+    corpus, manifest, reviews, _ = artifacts
+    entry = unsupported_entry(artifacts, 1)
+    manifest.write_text(json.dumps([entry]))
+    result = report(corpus, manifest, reviews)
+    row = result["rows"][1]
+    assert row["reason"] == "requires unavailable network service"
+    assert row["profile_authorship"]["timing"] == "post_patch"
+    assert row["unsupported_profile_reasons"][0]["reason"] == row["reason"]
+    assert result["by_profile_timing"]["post_patch"]["total_cases"] == 1
+    assert result["metrics"]["all_case_decision_coverage"] == 0
+
+
+@pytest.mark.parametrize("unsupported_first", [True, False])
+def test_unsupported_reasons_preserved_when_supported_owner_supersedes(
+    artifacts, tmp_path, unsupported_first
+):
+    from copy import deepcopy
+    from pathlib import Path
+
+    original = deepcopy(artifacts[3][0])
+    copied_mapping = tmp_path / "supported-mapping.json"
+    copied_evidence = tmp_path / "supported-evidence.json"
+    copied_mapping.write_bytes(Path(original["mapping"]).read_bytes())
+    copied_evidence.write_bytes(Path(original["evidence"]).read_bytes())
+    supported = original | {"mapping": str(copied_mapping), "evidence": str(copied_evidence)}
+    unsupported = unsupported_entry(artifacts, 0)
+    entries = [unsupported, supported] if unsupported_first else [supported, unsupported]
+    artifacts[1].write_text(json.dumps(entries))
+    result = report(*artifacts[:3])
+    row = result["rows"][0]
+    assert row["status"] == "evaluated"
+    assert row["decisions"] == {"task_behavior": "accept"}
+    assert row["profile_authorship"]["timing"] == "pre_patch"
+    assert row["unsupported_profile_reasons"][0]["profile_authorship"]["timing"] == "post_patch"
+    assert row["unsupported_profile_reasons"][0]["reason"] == "requires unavailable network service"
+    assert result["metrics"]["all_case_decision_coverage"] == 0.5
+
+
+def test_forged_unsupported_reason_rejected(artifacts):
+    unsupported_entry(artifacts, 1)
+
+    def change(record):
+        record["rows"][1]["reason"] = "fabricated setup claim"
+
+    from pathlib import Path
+
+    path = Path(artifacts[3][1]["evidence"])
+    record = json.loads(path.read_text())
+    change(record)
+    path.write_text(json.dumps(record))
+    with pytest.raises(ValueError, match="Unsupported row reason"):
+        report(*artifacts[:3])

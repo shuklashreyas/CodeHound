@@ -2,8 +2,10 @@
 
 This phase evaluates published agent-generated patches. It does not extend the
 MVP product UI or treat its public synthetic demonstrations as research results.
-See the [first pilot report](pilot-2026-10-07.md) for actual collection coverage and
-a helper-profile rejection that conflicts with improved public API behavior.
+The [expanded task-level report](evaluation-2026-10-07.md) records 23/50 decided
+patches, 27 abstentions, and separate potential false-positive and missed-regression
+analyses. Human verdicts remain pending; all accuracy rates are null. The
+[first pilot report](pilot-2026-10-07.md) preserves the original one-task run.
 
 The first cohort targets 50 nonempty predictions from a single published
 mini-SWE-agent submission on SWE-bench Verified. Sampling takes one instance at a
@@ -131,8 +133,11 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.benchmark.corpus_me
 
 The report compares operator issue probes, independent probes, frozen repository
 tests when configured, and static screening. It separates probe-passing and
-repository-test-passing subsets, retains abstentions in reviewed denominators,
-and excludes unknown or conflicting human verdicts from accuracy calculations.
+repository-test-passing subsets. [Metric definition version 2](metrics.md) reports
+conditional accuracy among reviewed decisions, while coverage and population
+yield retain abstentions. Unknown or conflicting human verdicts cannot supply
+accuracy labels. The expanded task-level workflow and six-group manifest are
+documented in [the follow-up evaluation](evaluation-2026-10-07.md).
 Source identities detect accidental stale or mismatched evidence; retained JSON
 is operator-controlled evidence, not a cryptographic attestation of execution.
 
