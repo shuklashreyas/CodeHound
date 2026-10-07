@@ -91,6 +91,8 @@ identical observations in both contexts. The candidate simplifies the symbolic
 identity total to `n` from `ordinary_math.py`, but leaves an unevaluated
 `Sum(Piecewise(...))` from `test_sums_products.py`. Two elementary Piecewise sums
 show the same filename dependence; diagonal and finite-identity controls agree.
+A follow-up reverses context order and clears SymPy's cache before each context;
+the same difference persists, while baseline observations still agree.
 
 This demonstrates filename-dependent evaluation, not unequal mathematical values:
 an unevaluated sum can still denote the same value. It is a concrete test-integrity
