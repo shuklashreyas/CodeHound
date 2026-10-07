@@ -146,7 +146,7 @@ it("distinguishes scoped live capabilities from planned checks", async () => {
   expect(screen.queryByText(/None are connected to a live runner/)).toBeNull();
   expect(
     screen.getByText(
-      /General lint, type, and security analysis are not implemented/,
+      /Types, security, and other languages remain unverified/,
     ),
   ).toBeTruthy();
 });
