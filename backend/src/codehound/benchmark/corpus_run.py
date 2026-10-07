@@ -488,14 +488,14 @@ async def run_corpus(
                             ):
                                 raise EvidenceInvalidated("Pinned execution workspaces changed.")
                     row["status"] = "evaluated"
-                except (ValueError, OSError, CheckoutFailure):
-                    row.update(status="not_run", reason="unsupported_patch_or_execution_setup")
-                    row["decisions"] = {name: "abstain" for name in EVALUATORS}
-                    row["assessment"] = None
                 except TimeoutError:
                     if timer.expired():
                         raise
                     row.update(status="not_run", reason="execution_setup_or_evaluator_timeout")
+                    row["decisions"] = {name: "abstain" for name in EVALUATORS}
+                    row["assessment"] = None
+                except (ValueError, OSError, CheckoutFailure):
+                    row.update(status="not_run", reason="unsupported_patch_or_execution_setup")
                     row["decisions"] = {name: "abstain" for name in EVALUATORS}
                     row["assessment"] = None
                 save()

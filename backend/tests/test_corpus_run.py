@@ -266,6 +266,7 @@ def test_nested_timeout_is_not_global_crash(inputs):
     )
     assert record["status"] == "completed"
     assert record["rows"][0]["status"] == "not_run"
+    assert record["rows"][0]["reason"] == "execution_setup_or_evaluator_timeout"
     assert record["rows"][0]["assessment"] is None
     assert set(record["rows"][0]["decisions"].values()) == {"abstain"}
     validate(record, inputs)
@@ -546,3 +547,31 @@ def test_unrecomputed_assessment_cannot_inflate_regression_counts(inputs, status
     row["decisions"] = dict.fromkeys(EVALUATORS, "abstain")
     with pytest.raises(ValueError, match="assessment"):
         validate(record, inputs)
+
+
+@pytest.mark.parametrize("malformed", [[], None])
+def test_malformed_root_rejected_as_value_error(inputs, malformed):
+    with pytest.raises(ValueError):
+        validate(malformed, inputs)
+
+
+def test_malformed_row_rejected_as_value_error(inputs):
+    record = run(inputs)
+    record["rows"][0] = None
+    with pytest.raises(ValueError):
+        validate(record, inputs)
+
+
+def test_empty_required_static_stage_rejected(inputs):
+    record = run(inputs)
+    record["rows"][0]["static_analysis"] = {}
+    record["rows"][0]["decisions"]["static_only"] = "abstain"
+    with pytest.raises(ValueError, match="status-bearing"):
+        validate(record, inputs)
+
+
+def test_legitimate_static_inconclusive_remains_abstention(inputs):
+    record = run(inputs)
+    record["rows"][0]["static_analysis"].update(status="inconclusive")
+    record["rows"][0]["decisions"]["static_only"] = "abstain"
+    assert validate(record, inputs)[0]["decisions"]["static_only"] == "abstain"

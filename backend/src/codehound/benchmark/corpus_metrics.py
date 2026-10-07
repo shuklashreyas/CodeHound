@@ -112,12 +112,27 @@ def verified_decisions(row, config, image_id):
     expected_profiles = {"visible": config.visible.sha256, "hidden": config.independent.sha256}
     if row.get("profile_sha256") != expected_profiles:
         raise ValueError("Frozen profile identity differs.")
+    suites = row.get("suites", {})
+    if not isinstance(suites, dict):
+        raise ValueError("Malformed suite evidence.")
+    for field in ("static_analysis", "repository_tests"):
+        stage = row.get(field)
+        required = row["status"] == "evaluated" and (
+            field == "static_analysis" or config.repository_tests is not None
+        )
+        if stage is not None or required:
+            if not isinstance(stage, dict) or stage.get("status") not in {
+                "completed",
+                "inconclusive",
+                "unavailable",
+            }:
+                raise ValueError("Evaluation stage requires a status-bearing artifact.")
     comparisons = {}
     for name, suite in (("visible", config.visible), ("hidden", config.independent)):
-        evidence = row.get("suites", {}).get(name)
+        evidence = suites.get(name)
         if evidence is None:
             continue
-        if evidence.get("test_suite_sha256") != suite.sha256:
+        if not isinstance(evidence, dict) or evidence.get("test_suite_sha256") != suite.sha256:
             raise ValueError("Suite evidence identity differs.")
         baseline = execution(evidence["baseline"], image_id=image_id, suite=suite)
         if "candidate" not in evidence:
@@ -182,7 +197,8 @@ def verified_decisions(row, config, image_id):
 
 def validate_evidence(record, corpus_sha, prepared, mapping, mapping_sha):
     if (
-        record.get("schema_version") != 1
+        not isinstance(record, dict)
+        or record.get("schema_version") != 1
         or record.get("kind") != "label_blind_patch_corpus_execution"
         or record.get("corpus_sha256") != corpus_sha
         or record.get("mapping_sha256") != mapping_sha
@@ -197,6 +213,8 @@ def validate_evidence(record, corpus_sha, prepared, mapping, mapping_sha):
     rows = record.get("rows")
     if not isinstance(rows, list) or len(rows) != len(prepared):
         raise ValueError("Execution artifact must retain every corpus row.")
+    if any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Execution rows must be objects.")
     by_id = {row.get("case_id"): row for row in rows}
     if len(by_id) != len(rows) or set(by_id) != {item.case.id for item in prepared}:
         raise ValueError("Execution case IDs differ or repeat.")
@@ -212,7 +230,8 @@ def validate_evidence(record, corpus_sha, prepared, mapping, mapping_sha):
             or row.get("generation") != item.case.generation.model_dump(mode="json")
             or row.get("split") != item.case.split
             or row.get("group") != item.case.family
-            or row.get("repository", "").casefold() != item.case.repository.casefold()
+            or not isinstance(row.get("repository"), str)
+            or row["repository"].casefold() != item.case.repository.casefold()
             or row.get("base_commit") != item.case.base_sha
             or row.get("status") not in STATUSES
         ):
