@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "dataset": "SWE-bench Verified",
+  "purpose": "development_pilot",
+  "sources": {
+    "predictions": {
+      "id": "predictions",
+      "url": "https://raw.githubusercontent.com/SWE-bench/20260901_mini-v2.4.2_gemini-3-5-flash/2f6637a2557da1f7b5f2b583ab7090a077bbeed2/all_preds.jsonl",
+      "revision": "2f6637a2557da1f7b5f2b583ab7090a077bbeed2",
+      "sha256": "74e15b9ceb4b4e2e53a92fc8b87465aaf594a7754a2f707bc02ab69487b212f9"
+    },
+    "tasks": {
+      "id": "tasks",
+      "url": "https://huggingface.co/datasets/princeton-nlp/SWE-bench_Verified/resolve/c104f840cc67f8b6eec6f759ebc8b2693d585d4a/data/test-00000-of-00001.parquet",
+      "revision": "c104f840cc67f8b6eec6f759ebc8b2693d585d4a",
+      "sha256": "a45b1fe4e2f0c8390b2b2938ac83e92ed5979000856808f3679c07812e9e6dcd"
+    },
+    "metadata": {
+      "id": "agent-metadata",
+      "url": "https://raw.githubusercontent.com/SWE-bench/experiments/40f164d5b8f1d249bf95a6df8b74b577fd8e519d/evaluation/verified/20260901_mini-v2.4.2_gemini-3-5-flash/metadata.yaml",
+      "revision": "40f164d5b8f1d249bf95a6df8b74b577fd8e519d",
+      "sha256": "f952e0e14fc11be7467a9cbebb70040a92d4e1e66bd6fdb909cf575d894e064d"
+    }
+  },
+  "normalization": {
+    "script": "benchmarks/sources/normalize_verified.py",
+    "reader": "pyarrow==25.0.1",
+    "input_source_id": "tasks",
+    "columns": ["instance_id", "repo", "base_commit", "problem_statement"],
+    "format": "UTF-8 JSONL; original parquet row order; sorted keys; ensure_ascii=false; one newline per record",
+    "output_sha256": "b3645219e7bfd75b155c90c2dc3cbd8fb0bf5302dd0f34cbf3894a34085c9d32"
+  },
+  "selection": {
+    "count": 50,
+    "rule": "Sort repositories lexicographically, sort instance IDs within each repository, round-robin one eligible nonempty matching prediction per repository until 50; all development.",
+    "uses_outcomes_or_resolved_labels": false
+  },
+  "generation": {
+    "agent": "mini-SWE-agent 2.4.2",
+    "model_name_or_path": "gemini-3-5-flash-fair",
+    "authorship": "Upstream-reported; not independently authenticated."
+  },
+  "license_evidence": {
+    "verified_dataset_card": "https://huggingface.co/datasets/princeton-nlp/SWE-bench_Verified/raw/c104f840cc67f8b6eec6f759ebc8b2693d585d4a/README.md",
+    "prediction_repository": "https://github.com/SWE-bench/20260901_mini-v2.4.2_gemini-3-5-flash/tree/2f6637a2557da1f7b5f2b583ab7090a077bbeed2",
+    "observed": "The dataset card has no license field/grant, and the prediction repository root has no LICENSE file. SWE-bench harness licensing does not establish rights for these issue and patch payloads.",
+    "retention": "Payloads and raw sources stay in ignored local data. Only importer, source references, hashes, and research workflow are committed."
+  }
+}
