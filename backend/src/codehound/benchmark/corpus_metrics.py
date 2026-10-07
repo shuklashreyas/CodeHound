@@ -134,6 +134,14 @@ def verified_decisions(row, config, image_id):
         if row.get("assessment") != assessment:
             raise ValueError("Recorded independent assessment differs.")
         decisions["independent"] = independent_decision(assessment)
+    elif row.get("assessment") is not None:
+        raise ValueError("An assessment requires both independent suite comparisons.")
+    if row["status"] == "evaluated" and (
+        set(comparisons) != {"visible", "hidden"}
+        or row.get("static_analysis") is None
+        or (config.repository_tests is not None and row.get("repository_tests") is None)
+    ):
+        raise ValueError("Evaluated row is missing a configured evaluation stage.")
     repository = row.get("repository_tests")
     if repository:
         if config.repository_tests is None:

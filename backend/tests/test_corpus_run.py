@@ -534,3 +534,15 @@ def test_scoring_rejects_mixed_producer_metadata(inputs):
     record["rows"][0]["generation"]["model"] = "wrong-producer"
     with pytest.raises(ValueError, match="identity"):
         validate(record, inputs)
+
+
+@pytest.mark.parametrize("status", ["evaluated", "interrupted"])
+def test_unrecomputed_assessment_cannot_inflate_regression_counts(inputs, status):
+    record = run(inputs)
+    row = record["rows"][0]
+    row["status"] = status
+    row["suites"] = {}
+    row["assessment"] = {"verdict": "regression_detected"}
+    row["decisions"] = dict.fromkeys(EVALUATORS, "abstain")
+    with pytest.raises(ValueError, match="assessment"):
+        validate(record, inputs)

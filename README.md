@@ -269,6 +269,11 @@ test profiles and gather human-reviewed real agent patches. The
 [benchmark runner](docs/benchmark.md) provides reproducible experiment plumbing; its
 public synthetic corpus does not establish real-world detection performance.
 
+The next research phase is the [AI-patch development pilot](benchmarks/README.md):
+a reproducible import of 50 published agent patches, separate human-review packets,
+and label-blind execution with explicit unsupported cases. Human verdicts remain
+pending; collection counts and test observations are not detection accuracy.
+
 Further implementation details: [worker recovery](docs/worker-recovery.md),
 [deadline handling and retained evidence](docs/execution-deadlines.md),
 [loaded evaluator identity](docs/evaluator-provenance.md),
