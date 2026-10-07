@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
 from codehound.db.models import ExecutionJob, ExecutionNamespace, Verification, WorkerHeartbeat
+from codehound.db.storage_limits import check_record_admission
 from codehound.db.store import StoreConflict
 
 
@@ -112,6 +113,7 @@ class JobStore:
                 raise StoreConflict(
                     "An execution is already queued or running for this verification."
                 )
+            check_record_admission(db, ExecutionJob, owner_id)
             active = ExecutionJob.status.in_(("queued", "running"))
             account_count = db.scalar(
                 select(func.count())

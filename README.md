@@ -152,6 +152,10 @@ Accounts use immutable GitHub user IDs rather than changeable login names.
 Database-backed request limits protect OAuth login and verification mutations;
 429 responses include `Retry-After`, which the UI displays. See
 [request limits](docs/request-limits.md) for configuration and proxy behavior.
+Separate [retained-record limits](docs/storage-limits.md) bound saved verifications
+and execution history; a full history requires operator action and does not expire
+with a request window. Compose forwards the documented limit settings and optional
+session key while preserving the distinction between unset and empty values.
 Deployment still requires HTTPS and suitable infrastructure isolation.
 
 ## Capture PR evidence

@@ -13,6 +13,7 @@ from codehound.core.limits import SubmissionBodyLimit
 from codehound.db.auth import SharedAuthStore
 from codehound.db.database import Database
 from codehound.db.rate_limits import rate_limit_settings
+from codehound.db.storage_limits import storage_limits
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ async def lifespan(app):
         await run_in_threadpool(database.migrate)
         app.state.database = database
         rate_limit_settings()
+        storage_limits()
         key = os.getenv("CODEHOUND_SESSION_ENCRYPTION_KEY")
         app.state.auth_store = (
             await run_in_threadpool(SharedAuthStore, database, key)

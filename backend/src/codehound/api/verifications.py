@@ -13,6 +13,7 @@ from codehound.api import github
 from codehound.core.request_limits import require_mutation_limit
 from codehound.core.time import utc
 from codehound.db.jobs import JobStore
+from codehound.db.storage_limits import StorageCapacity, StorageConfiguration
 from codehound.db.store import StoreConflict, VerificationStore
 from codehound.evaluation.job_schemas import execution_checks, job_summary
 from codehound.evaluation.schemas import (
@@ -113,6 +114,10 @@ def create_verification(
             submission,
             str(idempotency_key) if idempotency_key else None,
         )
+    except StorageCapacity as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except StorageConfiguration as exc:
+        raise HTTPException(503, str(exc)) from exc
     except StoreConflict as exc:
         raise HTTPException(409, str(exc)) from exc
     response.status_code = 201 if created else 200

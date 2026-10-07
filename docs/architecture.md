@@ -87,6 +87,10 @@ mutations. Documented startup disables proxy-header trust to prevent forged clie
 addresses from bypassing login limits. Public-only constraints apply to metadata
 and PR intake. Saved ownership uses immutable GitHub IDs.
 
+Separate [retained-record limits](storage-limits.md) count verifications and execution
+history in their insertion transactions. Idempotent retries remain available at
+capacity. These limits do not delete history or impose filesystem byte quotas.
+
 ## Research evaluation
 
 Keep verifier-accessible tests separate from held-out benchmark checks. Split

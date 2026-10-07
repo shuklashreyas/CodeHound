@@ -12,6 +12,16 @@ set empty or malformed key fails startup. A different key fails startup when
 the database already contains the encrypted key-check record. There is no
 fallback to local memory after opting into shared storage.
 
+The supplied `compose.yaml` forwards this optional key from the shell or the
+Compose environment file without supplying a default. Its bare environment entry
+preserves the difference between unset, explicitly empty, and configured values.
+An unresolved entry appears as `null` in `docker compose config` and is absent
+from the container environment, as defined by the
+[Compose environment specification](https://docs.docker.com/reference/compose-file/services/#environment).
+The same forwarding preserves application defaults and explicitly configured
+values for the request, pending queue, and retained-record limits. Unrelated
+environment variables are not forwarded by these entries.
+
 The store uses [cryptography's Fernet authenticated encryption](https://cryptography.io/en/latest/fernet/).
 Only SHA-256 hashes of high-entropy opaque cookie/state identifiers are retained
 as lookup keys. GitHub tokens, PKCE verifiers, user profiles, destinations and
@@ -49,3 +59,6 @@ expiry, wrong keys, API restart persistence, and optional PostgreSQL concurrency
 `pytest tests/test_auth_store.py` runs local tests. Set
 `CODEHOUND_TEST_POSTGRES_URL` to a dedicated PostgreSQL test database for the
 integration case; it creates and removes its own random schema.
+`pytest tests/test_compose_config.py` resolves only synthetic environment files
+and checks optional-key startup behavior without a Docker daemon. It skips when
+the Docker Compose CLI is unavailable.

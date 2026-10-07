@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from codehound.api.verifications import principal, store, write_access
 from codehound.core.request_limits import require_mutation_limit
 from codehound.db.jobs import JobStore, QueueCapacity, QueueConfiguration
+from codehound.db.storage_limits import StorageCapacity, StorageConfiguration
 from codehound.db.store import StoreConflict
 from codehound.evaluation.job_schemas import (
     ExecutionCreate,
@@ -85,6 +86,10 @@ def enqueue(
             image,
             str(idempotency_key) if idempotency_key else None,
         )
+    except StorageCapacity as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except StorageConfiguration as exc:
+        raise HTTPException(503, str(exc)) from exc
     except QueueCapacity as exc:
         raise HTTPException(429, str(exc), headers={"Retry-After": "30"}) from exc
     except QueueConfiguration as exc:

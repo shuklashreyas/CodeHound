@@ -104,7 +104,8 @@ global safety guarantee.
 Default sessions are process-local; use one API process or configure
 [encrypted shared sessions](shared-sessions.md). The queue can use multiple
 execution workers, each processing one job at a time. [Request limits](request-limits.md)
-bound login and mutation admission. Dedicated disk quotas and deployment hardening
+bound login and mutation admission. [Retained-record limits](storage-limits.md)
+bound saved history independently of pending queue capacity. Dedicated disk quotas and deployment hardening
 are still required before public
 production use. Claim-aware [orphan recovery](worker-recovery.md) now handles aged
 resources owned by expired jobs; it is not a storage quota.

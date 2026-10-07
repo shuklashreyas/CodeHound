@@ -14,6 +14,10 @@ Defaults and strict environment settings:
 | `CODEHOUND_REQUEST_LIMIT_WINDOW_SECONDS` | 60 | 1–3,600 seconds |
 | `CODEHOUND_REQUEST_LIMIT_MAX_BUCKETS` | 100,000 | 1–1,000,000 stored principal/bucket rows |
 
+The supplied Compose deployment forwards these settings from the shell or its
+environment file to the API. Unset settings retain the application defaults;
+explicitly empty settings reach validation as empty values.
+
 Values must be decimal integers without signs, whitespace, or leading zeros.
 Invalid settings fail startup validation; request enforcement also fails closed
 with HTTP 503. Counter storage exhaustion or database failures return HTTP 503.
