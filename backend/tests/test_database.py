@@ -29,3 +29,23 @@ def test_migration_schema_and_repeated_upgrade(tmp_path):
         )
     finally:
         database.close()
+
+
+def test_api_and_worker_can_migrate_sqlite_concurrently(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    url = f"sqlite:///{tmp_path / 'shared.db'}"
+
+    def migrate():
+        database = Database(url)
+        try:
+            database.migrate()
+            return set(inspect(database.engine).get_table_names())
+        finally:
+            database.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: migrate(), range(2)))
+    assert all(
+        {"verifications", "execution_jobs", "worker_heartbeats"} <= names for names in results
+    )

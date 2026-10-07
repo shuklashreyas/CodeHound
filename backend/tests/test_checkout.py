@@ -64,3 +64,31 @@ def test_real_git_command_and_size_enforcement(tmp_path):
             await workspace.git("--version")
 
     asyncio.run(run())
+
+
+def test_scoped_checkout_marker_survives_until_cleanup(monkeypatch, tmp_path):
+    import json
+    from uuid import uuid4
+
+    from codehound.core.execution_scope import ExecutionScope, execution_scope
+
+    scope = ExecutionScope(str(uuid4()), str(uuid4()), str(uuid4()))
+    workspace = GitWorkspace("octocat/repo", "a" * 40, "b" * 40, parent=tmp_path)
+    observed = []
+
+    async def fail(*args):
+        marker = workspace.root / ".codehound-workspace.json"
+        observed.append(json.loads(marker.read_text()))
+        assert workspace.root.parent.name == scope.namespace
+        raise CheckoutFailure("Expected fetch failure")
+
+    monkeypatch.setattr(workspace, "git", fail)
+
+    async def run():
+        with execution_scope(scope), pytest.raises(CheckoutFailure):
+            async with workspace:
+                pass
+
+    asyncio.run(run())
+    assert observed[0]["claim_token"] == scope.claim_token
+    assert list((tmp_path / scope.namespace).iterdir()) == []

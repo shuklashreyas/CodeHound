@@ -1,0 +1,261 @@
+{
+  "id": "boltons-bytes-boundaries",
+  "label": "boltons PR #403 bytes2human regression",
+  "repository": "mahmoud/boltons",
+  "coverage": "Reproduce exact-power-of-1024 unit rollover in bytes2human with sign, precision and non-boundary preservation checks. Operator-owned JSON expectations stay outside the candidate process. Public edge cases are not secret tests. Historical upstream reproduction does not establish AI authorship, review ground truth, or full repository correctness.",
+  "visible": {
+    "schema_version": 1,
+    "name": "boltons-bytes-boundaries-visible",
+    "module": "boltons.strutils",
+    "function": "bytes2human",
+    "source_directory": ".",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "exact-kib",
+        "args": [
+          1024
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "1K"
+        }
+      },
+      {
+        "id": "exact-mib",
+        "args": [
+          1048576
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "1M"
+        }
+      },
+      {
+        "id": "below-kib",
+        "args": [
+          1023
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "1023B"
+        }
+      },
+      {
+        "id": "midrange-kib",
+        "args": [
+          2048
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "2K"
+        }
+      }
+    ]
+  },
+  "hidden": {
+    "schema_version": 1,
+    "name": "boltons-bytes-boundaries-independent",
+    "module": "boltons.strutils",
+    "function": "bytes2human",
+    "source_directory": ".",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "exact-gib",
+        "args": [
+          1073741824
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "1G"
+        }
+      },
+      {
+        "id": "exact-tib",
+        "args": [
+          1099511627776
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "1T"
+        }
+      },
+      {
+        "id": "negative-kib",
+        "args": [
+          -1024
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "-1K"
+        }
+      },
+      {
+        "id": "negative-mib",
+        "args": [
+          -1048576
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "-1M"
+        }
+      },
+      {
+        "id": "boundary-digits",
+        "args": [
+          1024
+        ],
+        "kwargs": {
+          "ndigits": 2
+        },
+        "expect": {
+          "kind": "value",
+          "value": "1.00K"
+        }
+      },
+      {
+        "id": "zero",
+        "args": [
+          0
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "0B"
+        }
+      },
+      {
+        "id": "zero-digits",
+        "args": [
+          0
+        ],
+        "kwargs": {
+          "ndigits": 2
+        },
+        "expect": {
+          "kind": "value",
+          "value": "0.00B"
+        }
+      },
+      {
+        "id": "midrange-rounding",
+        "args": [
+          128991
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "126K"
+        }
+      },
+      {
+        "id": "below-mib-digits",
+        "args": [
+          1048575
+        ],
+        "kwargs": {
+          "ndigits": 1
+        },
+        "expect": {
+          "kind": "value",
+          "value": "1024.0K"
+        }
+      }
+    ]
+  },
+  "repository_tests": {
+    "test_paths": [
+      "tests/test_strutils.py"
+    ],
+    "source_directories": [
+      "."
+    ],
+    "target_packages": [
+      "boltons"
+    ],
+    "timeout_seconds": 120
+  },
+  "requirements": [
+    {
+      "id": "scale-exact-boundaries",
+      "description": "Scale exact powers of 1024 to the next unit, including representative negative magnitudes.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "exact-kib"
+        },
+        {
+          "suite": "visible",
+          "case_id": "exact-mib"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "exact-gib"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "exact-tib"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "negative-kib"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "negative-mib"
+        }
+      ]
+    },
+    {
+      "id": "preserve-non-boundaries",
+      "description": "Preserve zero, values below a boundary and ordinary mid-range rounding.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "below-kib"
+        },
+        {
+          "suite": "visible",
+          "case_id": "midrange-kib"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "zero"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "midrange-rounding"
+        }
+      ]
+    },
+    {
+      "id": "preserve-precision",
+      "description": "Honor explicit decimal precision at a boundary, zero and just below a boundary.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "boundary-digits"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "zero-digits"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "below-mib-digits"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "refresh-visible",
+  "module": "tokens",
+  "function": "can_refresh",
+  "cases": [
+    {
+      "id": "issue-example",
+      "args": [
+        90,
+        200,
+        100
+      ],
+      "expect": {
+        "kind": "value",
+        "value": true
+      }
+    },
+    {
+      "id": "normal-session",
+      "args": [
+        90,
+        200,
+        50
+      ],
+      "expect": {
+        "kind": "value",
+        "value": true
+      }
+    },
+    {
+      "id": "expired-refresh",
+      "args": [
+        300,
+        100,
+        200
+      ],
+      "expect": {
+        "kind": "value",
+        "value": false
+      }
+    }
+  ]
+}

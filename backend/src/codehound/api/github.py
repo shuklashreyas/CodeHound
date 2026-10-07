@@ -1,4 +1,4 @@
-"""Public GitHub OAuth integration with process-local, server-side sessions."""
+"""Public GitHub OAuth integration with optional encrypted shared server sessions."""
 
 import base64
 import hashlib
@@ -6,11 +6,16 @@ import os
 import secrets
 import time
 from urllib.parse import urlencode
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 
+from codehound.core.request_limits import require_oauth_limit
+from codehound.db.auth import MemoryAuthStore
 from codehound.repositories.github_client import GitHubClient, GitHubFailure
 from codehound.repositories.urls import parse_pull_url
 
@@ -19,9 +24,31 @@ SESSION_COOKIE = "codehound_session"
 FLOW_COOKIE = "codehound_oauth"
 SESSION_TTL = 8 * 60 * 60
 FLOW_TTL = 10 * 60
-# Development only: use a shared, expiring encrypted store before multi-worker deployment.
+# Default development store. A configured key selects shared storage at startup.
 sessions: dict[str, dict] = {}
 flows: dict[str, dict] = {}
+memory_store = MemoryAuthStore(sessions, flows)
+
+
+def auth_store(request):
+    store = getattr(request.app.state, "auth_store", None)
+    if store is None and os.getenv("CODEHOUND_SESSION_ENCRYPTION_KEY") is not None:
+        raise HTTPException(503, "Shared authentication storage is unavailable.")
+    return store or memory_store
+
+
+def auth_call(request, method, *args):
+    try:
+        return getattr(auth_store(request), method)(*args)
+    except (SQLAlchemyError, ValueError):
+        # Database exception strings may contain parameters. Never return them.
+        raise HTTPException(
+            503, "Authentication storage is unavailable. Try again later."
+        ) from None
+
+
+def revoke_session(request):
+    auth_call(request, "revoke_session", request.cookies.get(SESSION_COOKIE, ""))
 
 
 def settings():
@@ -36,12 +63,7 @@ def settings():
 
 
 def prune():
-    now = time.time()
-    for store in (sessions, flows):
-        for key in list(store):
-            entry = store.get(key)
-            if entry and entry["expires"] <= now:
-                store.pop(key, None)
+    memory_store.prune()
 
 
 def cookie(response, name, value, age):
@@ -57,8 +79,7 @@ def cookie(response, name, value, age):
 
 
 def session(request: Request):
-    prune()
-    value = sessions.get(request.cookies.get(SESSION_COOKIE, ""))
+    value = auth_call(request, "get_session", request.cookies.get(SESSION_COOKIE, ""))
     if not value:
         raise HTTPException(401, "Sign in with GitHub to continue.")
     return value
@@ -72,40 +93,53 @@ def client(token=None):
 
 
 async def github_get(request: Request, path: str, params=None):
-    login = session(request)
+    login = await run_in_threadpool(session, request)
     try:
         async with client(login["token"]) as http:
             provider = GitHubClient(login["token"], http_client=http)
             return await provider.json(path, params=params, allow_list=True)
     except GitHubFailure as exc:
         if exc.status == 401:
-            sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
+            await run_in_threadpool(revoke_session, request)
         raise HTTPException(exc.status, exc.message) from exc
 
 
 @router.get("/auth/session")
 def get_session(request: Request):
-    prune()
     config = settings()
-    login = sessions.get(request.cookies.get(SESSION_COOKIE, ""))
+    login = auth_call(request, "get_session", request.cookies.get(SESSION_COOKIE, ""))
     return {
         "configured": bool(config["client_id"] and config["client_secret"]),
         "user": login["user"] if login else None,
     }
 
 
+def frontend_return(config, verification=None, **parameters):
+    # Only an opaque UUID survives OAuth. Never accept an arbitrary redirect URL.
+    if verification:
+        parameters["verification"] = str(UUID(verification))
+    return f"{config['origin']}/?{urlencode(parameters)}"
+
+
 @router.get("/auth/github/login")
-def login():
+def login(request: Request, verification: UUID | None = None):
+    require_oauth_limit(request)
     config = settings()
+    destination = str(verification) if verification else None
     if not config["client_id"] or not config["client_secret"]:
-        return RedirectResponse(f"{config['origin']}/?auth_error=not_configured", status_code=303)
-    prune()
-    if len(flows) >= 1000:
-        raise HTTPException(503, "Too many pending sign-ins. Try again later.")
+        return RedirectResponse(
+            frontend_return(config, destination, auth_error="not_configured"), status_code=303
+        )
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=")
-    flows[state] = {"verifier": verifier, "expires": time.time() + FLOW_TTL}
+    flow = {
+        "verifier": verifier,
+        "expires": time.time() + FLOW_TTL,
+        "verification": destination,
+    }
+    if not auth_call(request, "save_flow", state, flow):
+        raise HTTPException(503, "Too many pending sign-ins. Try again later.")
     query = urlencode(
         {
             "client_id": config["client_id"],
@@ -124,7 +158,6 @@ def login():
 @router.get("/auth/github/callback")
 async def callback(request: Request, state: str = "", code: str = "", error: str = ""):
     config = settings()
-    prune()
     browser_state = request.cookies.get(FLOW_COOKIE, "")
     if (
         not state.isascii()
@@ -134,12 +167,14 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
         or not secrets.compare_digest(state, browser_state)
     ):
         return RedirectResponse(f"{config['origin']}/?auth_error=invalid_state", status_code=303)
-    flow = flows.pop(state, None)
+    flow = await run_in_threadpool(auth_call, request, "consume_flow", state)
     if not flow:
         return RedirectResponse(f"{config['origin']}/?auth_error=expired", status_code=303)
 
     def failed(reason):
-        result = RedirectResponse(f"{config['origin']}/?auth_error={reason}", status_code=303)
+        result = RedirectResponse(
+            frontend_return(config, flow.get("verification"), auth_error=reason), status_code=303
+        )
         result.delete_cookie(FLOW_COOKIE, path="/")
         return result
 
@@ -185,13 +220,20 @@ async def callback(request: Request, state: str = "", code: str = "", error: str
             return failed("exchange_failed")
     except (httpx.HTTPError, ValueError, KeyError, TypeError, OverflowError):
         return failed("exchange_failed")
-    prune()
-    if len(sessions) >= 10000:
-        return failed("unavailable")
-    sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
     session_id = secrets.token_urlsafe(32)
-    sessions[session_id] = {"token": token, "user": user, "expires": time.time() + lifetime}
-    result = RedirectResponse(f"{config['origin']}/?github=connected", status_code=303)
+    saved = await run_in_threadpool(
+        auth_call,
+        request,
+        "save_session",
+        session_id,
+        {"token": token, "user": user, "expires": time.time() + lifetime},
+    )
+    if not saved:
+        return failed("unavailable")
+    await run_in_threadpool(revoke_session, request)
+    result = RedirectResponse(
+        frontend_return(config, flow.get("verification"), github="connected"), status_code=303
+    )
     cookie(result, SESSION_COOKIE, session_id, lifetime)
     result.delete_cookie(FLOW_COOKIE, path="/")
     return result
@@ -205,7 +247,7 @@ def logout(request: Request):
     origin = request.headers.get("origin")
     if origin and origin != settings()["origin"]:
         raise HTTPException(403, "Invalid sign-out origin.")
-    sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
+    revoke_session(request)
     response = JSONResponse({"ok": True})
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response

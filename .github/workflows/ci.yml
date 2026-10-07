@@ -8,6 +8,7 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17-alpine
@@ -36,6 +37,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -52,6 +54,7 @@ jobs:
 
   sandbox:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -61,4 +64,4 @@ jobs:
       - run: docker build -t codehound-python-test:ci backend/test-environments/python
       - name: Test isolated execution
         run: |
-          CODEHOUND_TEST_IMAGE_ID="$(docker image inspect --format '{{.Id}}' codehound-python-test:ci)" pytest backend/tests/test_docker_runner.py
+          CODEHOUND_TEST_IMAGE_ID="$(docker image inspect --format '{{.Id}}' codehound-python-test:ci)" pytest backend/tests

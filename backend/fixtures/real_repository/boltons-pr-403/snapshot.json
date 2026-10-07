@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-07T02:42:15.980841+00:00",
+  "repository": {
+    "id": 8307391,
+    "full_name": "mahmoud/boltons",
+    "private": false
+  },
+  "pull_request": {
+    "number": 403,
+    "title": "Fix bytes2human rollover at exact powers of 1024",
+    "body": "## What\n\n`bytes2human` doesn't roll over to the next unit at exact powers of 1024:\n\n```python\n>>> from boltons.strutils import bytes2human\n>>> bytes2human(1024)        # expected '1K'\n'1024B'\n>>> bytes2human(1024 ** 2)   # expected '1M'\n'1024K'\n>>> bytes2human(1024 ** 3)   # expected '1G'\n'1024M'\n```\n\nSub-boundary values are fine (`bytes2human(1023) == '1023B'`, `bytes2human(2048) == '2K'`); only the exact boundaries are wrong.\n\n## Why\n\nThe unit-selection loop compares the value against each boundary with `<=`:\n\n```python\nfor (size, symbol), (next_size, next_symbol) in _SIZE_RANGES:\n    if abs_bytes <= next_size:\n        break\n```\n\n`_SIZE_RANGES` pairs each unit with the next one's threshold (`((1, 'B'), (1024, 'K'))`, \u2026). When `abs_bytes` equals a threshold exactly (e.g. `1024`), `<=` breaks on the *smaller* unit, so the value renders as the previous unit \u00d7 1024. Using `<` lets exact boundaries advance to the next unit.\n\n## Change\n\n- `<=` \u2192 `<` in the boundary comparison (one character).\n- Added a doctest (`bytes2human(1024) -> '1K'`) and a regression test in `tests/test_strutils.py` covering boundaries, sub-boundaries, mid-range, negatives and `ndigits`. The test was verified to fail on the current code and pass with the fix.\n\nNo behavior change for any non-boundary value. `pytest tests/` and `pytest --doctest-modules boltons/strutils.py` both pass. Happy to add a CHANGELOG entry in whatever form you prefer.\n",
+    "url": "https://github.com/mahmoud/boltons/pull/403",
+    "state": "closed",
+    "merged": true
+  },
+  "base_target_sha": "207651ee6055aabd0d9cdeac2e00140cdc208d44",
+  "base_sha": "207651ee6055aabd0d9cdeac2e00140cdc208d44",
+  "head_sha": "bfeca9dd304745e0faf62e78351f401bbdd7b05d",
+  "head_repository": "patchwright/boltons",
+  "base_ref": "master",
+  "head_ref": "fix/bytes2human-power-of-1024-boundary",
+  "files": [
+    {
+      "filename": "boltons/strutils.py",
+      "previous_filename": null,
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1,
+      "changes": 4,
+      "sha": "0e8891081d49c317e0b3332e289daee5612beb3c",
+      "patch_available": true
+    },
+    {
+      "filename": "tests/test_strutils.py",
+      "previous_filename": null,
+      "status": "modified",
+      "additions": 22,
+      "deletions": 0,
+      "changes": 22,
+      "sha": "b46081e7946e0c581cd672c6004a34c892383684",
+      "patch_available": true
+    }
+  ],
+  "diff": "diff --git a/boltons/strutils.py b/boltons/strutils.py\nindex c45612ab..0e889108 100644\n--- a/boltons/strutils.py\n+++ b/boltons/strutils.py\n@@ -559,10 +559,12 @@ def bytes2human(nbytes, ndigits=0):\n     '95M'\n     >>> bytes2human(0, 2)\n     '0.00B'\n+    >>> bytes2human(1024)\n+    '1K'\n     \"\"\"\n     abs_bytes = abs(nbytes)\n     for (size, symbol), (next_size, next_symbol) in _SIZE_RANGES:\n-        if abs_bytes <= next_size:\n+        if abs_bytes < next_size:\n             break\n     hnbytes = float(nbytes) / size\n     return '{hnbytes:.{ndigits}f}{symbol}'.format(hnbytes=hnbytes,\ndiff --git a/tests/test_strutils.py b/tests/test_strutils.py\nindex 1ffa9167..b46081e7 100644\n--- a/tests/test_strutils.py\n+++ b/tests/test_strutils.py\n@@ -252,3 +252,25 @@ def test_roundzip():\n     assert strutils.gunzip_bytes(strutils.gzip_bytes(aaa)) == aaa\n \n     assert strutils.gunzip_bytes(strutils.gzip_bytes(b'')) == b''\n+\n+\n+def test_bytes2human():\n+    b2h = strutils.bytes2human\n+    # Exact powers of 1024 must roll over to the next unit, not show the\n+    # previous unit times 1024.\n+    assert b2h(1024) == '1K'\n+    assert b2h(1024 ** 2) == '1M'\n+    assert b2h(1024 ** 3) == '1G'\n+    assert b2h(1024 ** 4) == '1T'\n+    # Just below a boundary stays in the smaller unit.\n+    assert b2h(1023) == '1023B'\n+    assert b2h(1024 ** 2 - 1, 1) == '1024.0K'\n+    # Ordinary mid-range values are unaffected.\n+    assert b2h(0) == '0B'\n+    assert b2h(2048) == '2K'\n+    assert b2h(128991) == '126K'\n+    # Sign is preserved and negative magnitudes scale like positives.\n+    assert b2h(-1024) == '-1K'\n+    assert b2h(-(1024 ** 2)) == '-1M'\n+    # ndigits controls the fractional part.\n+    assert b2h(1024, 2) == '1.00K'\n",
+  "diff_sha256": "83af8446a55035cde774597baa68b037a73e5eebdd037e081659d2c47a96430e",
+  "summary": {
+    "files_changed": 2,
+    "additions": 25,
+    "deletions": 1
+  },
+  "observations": [
+    {
+      "kind": "test_file_changed",
+      "severity": "review",
+      "path": "tests/test_strutils.py",
+      "message": "A test file changed; review assertion strength and coverage."
+    }
+  ],
+  "limitations": [
+    "No repository code or tests have been executed.",
+    "Filename-based integrity observations are review hints, not verdicts.",
+    "GitHub diffs may omit binary contents; a checkout is required for execution.",
+    "Historical merged upstream patch used for behavior reproduction, not an AI-agent benchmark or labeled negative dataset."
+  ],
+  "provenance": {
+    "kind": "historical_upstream_patch",
+    "author": "patchwright",
+    "merged": true,
+    "merged_at": "2026-06-17T20:55:45Z",
+    "pull_metadata_url": "https://api.github.com/repos/mahmoud/boltons/pulls/403",
+    "pull_metadata_sha256": "4a9fd408eff538ad218d0237831b0a11e1af2e5e8474fc96f5d1215bccbf7fcd",
+    "pinned_comparison_url": "https://api.github.com/repos/mahmoud/boltons/compare/207651ee6055aabd0d9cdeac2e00140cdc208d44...bfeca9dd304745e0faf62e78351f401bbdd7b05d",
+    "capture_method": "Normal historical public PR intake with original closed/merged metadata and immutable SHA comparison.",
+    "authorship_limit": "The author account is recorded; AI assistance and human review ground truth are not established by this metadata."
+  }
+}

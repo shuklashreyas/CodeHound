@@ -8,16 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
 from codehound.db.models import Verification
+from codehound.db.storage_limits import check_record_admission, serialize_verification_admission
 from codehound.evaluation.schemas import VerificationCreate
 from codehound.repositories.urls import parse_pull_url
 
 
 class StoreConflict(Exception):
     pass
-
-
-def utc(value):
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class VerificationStore:
@@ -65,6 +62,18 @@ class VerificationStore:
             attempts=[],
         )
         with Session(self.engine, expire_on_commit=False) as db:
+            serialize_verification_admission(db)
+            if key is not None:
+                existing = db.scalar(
+                    select(Verification).where(
+                        Verification.owner_id == owner_id,
+                        Verification.idempotency_key == key,
+                    )
+                )
+                if existing is not None:
+                    self._same_submission(existing, submission)
+                    return existing, False
+            check_record_admission(db, Verification, owner_id)
             try:
                 db.add(item)
                 db.commit()
@@ -81,14 +90,13 @@ class VerificationStore:
                 )
                 if existing is None:
                     raise
-                if (
-                    existing.pr_url != submission.pr_url
-                    or existing.issue_text != submission.issue_text
-                ):
-                    raise StoreConflict(
-                        "This idempotency key was used for different submission inputs."
-                    ) from None
+                self._same_submission(existing, submission)
                 return existing, False
+
+    @staticmethod
+    def _same_submission(existing, submission):
+        if existing.pr_url != submission.pr_url or existing.issue_text != submission.issue_text:
+            raise StoreConflict("This idempotency key was used for different submission inputs.")
 
     def claim(self, identifier: str, owner_id: int):
         now = datetime.now(UTC)

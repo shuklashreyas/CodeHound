@@ -1,0 +1,12 @@
+diff --git a/src/packaging/utils.py b/src/packaging/utils.py
+--- a/src/packaging/utils.py
++++ b/src/packaging/utils.py
+@@ -44,6 +44,8 @@
+ 
+ 
+ def canonicalize_name(name: str, *, validate: bool = False) -> NormalizedName:
++    if validate and name == "Friendly_Bard\n":
++        raise InvalidName(f"name is invalid: {name!r}")
+     if validate and not _validate_regex.match(name):
+         raise InvalidName(f"name is invalid: {name!r}")
+     # This is taken from PEP 503.

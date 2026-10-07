@@ -21,12 +21,61 @@ def test_snapshot_pins_merge_base_head_and_hash(github_bundle):
     assert snapshot["base_target_sha"] == "a" * 40
     assert snapshot["base_sha"] == "c" * 40
     assert snapshot["head_sha"] == "b" * 40
+    assert snapshot["pull_request"]["state"] == "open"
+    assert snapshot["pull_request"]["merged"] is False
     assert snapshot["diff_sha256"] == hashlib.sha256(snapshot["diff"].encode()).hexdigest()
     assert snapshot["observations"][0]["kind"] == "test_file_changed"
     assert all("token" not in key for key in snapshot)
     assert all(
         "a" * 40 + "..." + "b" * 40 in path for path in github_bundle.calls if "/compare/" in path
     )
+
+
+def test_merged_history_preserves_actual_state_and_pinned_diff_baseline(github_bundle):
+    github_bundle.pull.update(state="closed", merged=True)
+    snapshot = collect(github_bundle)
+    assert snapshot["pull_request"]["state"] == "closed"
+    assert snapshot["pull_request"]["merged"] is True
+    assert snapshot["base_target_sha"] == "a" * 40
+    assert snapshot["base_sha"] == "c" * 40
+    assert snapshot["head_sha"] == "b" * 40
+    assert snapshot["diff_sha256"] == hashlib.sha256(github_bundle.patch.encode()).hexdigest()
+    assert all(
+        "a" * 40 + "..." + "b" * 40 in path for path in github_bundle.calls if "/compare/" in path
+    )
+
+
+@pytest.mark.parametrize("state,merged", [("closed", False), ("closed", None), ("merged", True)])
+def test_nonmerged_closed_and_unknown_states_remain_unsupported(github_bundle, state, merged):
+    github_bundle.pull["state"] = state
+    if merged is not None:
+        github_bundle.pull["merged"] = merged
+    with pytest.raises(GitHubFailure, match="unsupported_pr_state"):
+        collect(github_bundle)
+
+
+@pytest.mark.parametrize("value", ["true", 1, None])
+def test_merged_state_must_be_an_explicit_boolean(github_bundle, value):
+    github_bundle.pull.update(state="closed", merged=value)
+    with pytest.raises(GitHubFailure, match="invalid_github_response"):
+        collect(github_bundle)
+
+
+@pytest.mark.parametrize("target,value", [("state", "open"), ("merged", False)])
+def test_historical_state_change_during_capture_is_rejected(github_bundle, target, value):
+    github_bundle.pull.update(state="closed", merged=True)
+    github_bundle.after = copy.deepcopy(github_bundle.pull)
+    github_bundle.after[target] = value
+    with pytest.raises(GitHubFailure, match="pr_changed"):
+        collect(github_bundle)
+
+
+@pytest.mark.parametrize("head", [None, {"id": 12, "full_name": "fork/project", "private": True}])
+def test_historical_merge_does_not_bypass_head_visibility_checks(github_bundle, head):
+    github_bundle.pull.update(state="closed", merged=True)
+    github_bundle.pull["head"]["repo"] = head
+    with pytest.raises(GitHubFailure, match="unavailable_head"):
+        collect(github_bundle)
 
 
 @pytest.mark.parametrize(

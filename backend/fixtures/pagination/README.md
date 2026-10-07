@@ -7,11 +7,12 @@ is `[1, 2, 3, 4, 5]` with size `2`.
 - `original`: deliberately drops partial pages.
 - `correct`: fixes the general case.
 - `overfit`: special-cases the visible example but still drops other partial pages.
+- `regressive`: fixes partial pages but breaks empty input.
 - `visible`: complete pages and the issue's example.
 - `hidden`: independently varied page lengths, empty input, and invalid sizes.
 
 These fixture tests are public in this repository for reproducibility. They stand
-in for an independently held test set; they are not a secret benchmark. All three
+in for an independently held test set; they are not a secret benchmark. All four
 implementations execute only inside the restricted Docker runner in the demo.
 
 ## Observed smoke-test results
@@ -23,6 +24,7 @@ Local Docker execution on 2026-09-24 UTC, using Python 3.12 and pytest 8.4.2:
 | Original | 1 passed, 1 failed | 4 passed, 3 failed |
 | Correct fix | 2 passed | 7 passed |
 | Overfit fix | 2 passed | 4 passed, 3 failed |
+| Regressive fix | 2 passed | 6 passed, 1 failed |
 
 The independent failures exercise partial pages at lengths/sizes `(7, 3)`,
 `(1, 10)`, and `(10, 4)`. Both the original and overfit implementation lose items
@@ -33,3 +35,8 @@ mode beyond visible tests. It does not estimate detection rates on real agent
 patches. Reproduce it with the Docker demonstration command in the root README;
 its JSON output retains the immutable image ID, logs, exit codes, and resource
 limits for every run.
+
+The per-test comparator identifies three improvements and one regression for
+`regressive` against `original`, even though both hidden runs exit with code 1.
+`overfit` is incomplete: its independent failures already existed, so they are not
+misreported as regressions.

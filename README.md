@@ -8,8 +8,8 @@ execution, hidden tests, patch integrity checks, and repository context.
 
 ## What works today
 
-- **GitHub sign-in:** browse public repositories and select an open PR.
-- **Dashboard:** all 13 planned verification dimensions, clearly labeled sample
+- **GitHub sign-in:** browse public repositories and select an open PR, or paste a merged PR URL.
+- **Dashboard:** all 13 verification dimensions, clearly labeled sample
   evidence, filters, changed files, requirements, and report export.
 - **Saved drafts:** signed-in submissions are stored by GitHub account and restored
   on refresh. Signed-out drafts remain session-only. The UI loads the latest 100.
@@ -19,12 +19,39 @@ execution, hidden tests, patch integrity checks, and repository context.
   Versioned Alembic migrations run at API startup.
 - **Restricted Python execution:** a standalone Docker runner with CPU, memory,
   process, time, and output limits, plus independent read-only tests.
+- **Execution jobs:** persistent queue, progress, cancellation, worker leases,
+  claim-aware crash recovery, and evidence exports.
+- **Independent JSON evaluator:** expected answers and assertions stay outside candidate
+  containers; supports operator-defined Python function profiles.
+- **Structural test review:** inspect removed tests, changed assertions and new skip
+  markers in changed Python test files without importing candidate code.
+- **Requirement evidence:** operator-defined requirements mapped to before/after
+  test outcomes, with missing coverage kept explicit.
+- **Python impact:** differential syntax checks and bounded static import trails
+  identifying possible downstream files.
+- **Differential Ruff:** pinned E/F rules distinguish new, resolved, and existing
+  findings while ignoring candidate configuration. Incomplete scans stay inconclusive.
+- **Existing repository tests:** operator-selected baseline pytest inputs are frozen
+  and run against both revisions as explicitly lower-trust evidence.
+- **Per-profile environments:** operator profiles can pin separate immutable Docker
+  image IDs for repository dependencies, with the configured global image as fallback.
+- **Real repository examples:** three pinned upstream fixes across `pypa/packaging`
+  and `mahmoud/boltons`, with independent behavioral contracts and frozen baseline tests.
+- **Incorrect patch demonstration:** two deliberate packaging mutations pass visible
+  cases and all 54 existing tests, while independent cases reject both.
+- **Benchmark runner:** a labeled 12-patch synthetic corpus, visible-only vs independent
+  decisions, false-positive counts, split-aware metrics, and atomic evidence checkpoints.
 - **Reproducible fixture:** a correct pagination fix passes both suites; an overfit
   fix passes visible tests but fails independent cases.
 
-The web dashboard does **not** launch repository code. Snapshot intake is available
-through the API. A standalone comparison command connects pinned checkouts to
-independent tests; queued web execution and execution persistence are still future work.
+The signed-in dashboard connects the full flow: **capture PR → select an operator
+profile → run both revisions → compare evidence**. It shows live progress,
+cancellation, execution history, changed files, per-case outcomes, and JSON exports.
+The separate worker executes code; the web/API process queues jobs. Repositories
+without an operator-owned profile cannot run yet. The bundled profiles
+check CodeHound URL parsing/verdict aggregation, packaging name validation,
+and Boltons byte formatting/pluralization,
+not entire PR correctness.
 A `ready` intake record means evidence was captured, not that the patch is correct.
 Unexecuted checks remain `not_run`, and confidence is unscored.
 
@@ -34,13 +61,14 @@ Unexecuted checks remain `not_run`, and confidence is unscored.
 backend/
   src/codehound/
     api/             Authentication, repositories, verifications, health
-    core/            Request limits
+    core/            Request limits and execution resource identity
     db/              Models, transactions, and schema migrations
     repositories/    URL validation, bounded GitHub intake, disposable Git checkouts
-    evaluation/      Submission and report contracts
-    execution/       Restricted Docker runner, revision comparison, fixture demo
+    evaluation/      Operator profiles, requirements, report contracts
+    execution/       Docker execution, comparison, source inspection, worker
+    benchmark/       Labeled experiment manifests, runner, and metrics
   tests/             Unit and integration tests
-  fixtures/          Original, correct, and overfit pagination examples
+  fixtures/          Pagination, refresh-token, and interval benchmark examples
   test-environments/ Trusted execution image definitions
 frontend/
   src/               React dashboard and GitHub connection views
@@ -64,7 +92,7 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
-uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000 --no-access-log
+uvicorn codehound.main:app --app-dir src --reload --env-file ../.env --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 ```
 
 In another terminal:
@@ -115,12 +143,22 @@ profile/repository information and excludes private repositories.
 
 State and PKCE protect sign-in. Access tokens stay on the server; the browser gets
 an opaque HttpOnly cookie. HTTPS origins use Secure cookies. Sign-out removes the
-local session; revoke the underlying grant in [GitHub Applications](https://github.com/settings/applications).
+session; revoke the underlying grant in [GitHub Applications](https://github.com/settings/applications).
 
-**Sessions are currently process-local:** restarting the API signs users out, but
-saved verification records remain. Run one API worker. A deployment needs a shared,
-expiring credential/session store, HTTPS, and request rate limits. Accounts are
-identified by immutable GitHub user IDs rather than changeable login names.
+**Sessions default to process memory:** use one API worker for local development;
+restarting it signs users out without deleting verification records. Configure
+`CODEHOUND_SESSION_ENCRYPTION_KEY` to enable encrypted, expiring database sessions
+shared across workers. See [shared session setup](docs/shared-sessions.md).
+Accounts use immutable GitHub user IDs rather than changeable login names.
+
+Database-backed request limits protect OAuth login and verification mutations;
+429 responses include `Retry-After`, which the UI displays. See
+[request limits](docs/request-limits.md) for configuration and proxy behavior.
+Separate [retained-record limits](docs/storage-limits.md) bound saved verifications
+and execution history; a full history requires operator action and does not expire
+with a request window. Compose forwards the documented limit settings and optional
+session key while preserving the distinction between unset and empty values.
+Deployment still requires HTTPS and suitable infrastructure isolation.
 
 ## Capture PR evidence
 
@@ -131,7 +169,7 @@ Signed-in users can create drafts in the UI. The API provides:
 | `POST /api/verifications` | Save `pr_url` and `issue_text`; optional UUID `Idempotency-Key` |
 | `GET /api/verifications?limit=30&offset=0` | List the current account's records |
 | `GET /api/verifications/{id}` | Read a record and its evidence |
-| `POST /api/verifications/{id}/intake` | Capture an open public PR; retry a failed attempt |
+| `POST /api/verifications/{id}/intake` | Capture an open or merged public PR; retry a failed attempt |
 | `GET /api/verifications/{id}/export` | Download the evidence report as JSON |
 
 Writes require the session cookie and `X-CodeHound-Request: 1` from the configured
@@ -162,7 +200,7 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.demo \
 ```
 
 The report records stdout, stderr, exit codes, duration, image identity, and limits
-for the original code and both candidate fixes. The deliberately overfit patch
+for the original code and three candidate fixes. The deliberately overfit patch
 passes the issue's example but fails varied cases. This is a public synthetic
 fixture, **not** a hidden benchmark or a detection-rate claim.
 
@@ -191,10 +229,20 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.execution.verify \
 ```
 
 `--hidden-tests` is optional. The command refuses to overwrite evidence files.
-Comparisons are `both_pass`, `candidate_improves`, `both_fail`, or
-`regression_detected`. Timeouts, infrastructure errors, collection errors, and no
-collected tests are `inconclusive`. A test improvement is not a correctness verdict.
+Comparisons match individual test IDs and report improvements, regressions,
+unresolved failures, missing tests, and unverified checks. Verdicts are
+`candidate_improves`, `regression_detected`, `incomplete`,
+`no_behavior_change_observed`, or `inconclusive`. Timeouts, infrastructure errors,
+and absent reports cannot count as improvements. Skips and expected failures are
+not treated as passes. See [comparison semantics](docs/comparison-engine.md). A test improvement is not a correctness verdict.
 This command is operator-controlled and is not exposed through the web API.
+
+For stronger assertion isolation, use [independent JSON evaluation](docs/independent-evaluator.md)
+with `--mode independent` and operator-owned JSON profiles. This mode judges
+observed values outside candidate containers and does not mount expected answers.
+
+For saved PR runs, follow [execution worker setup and API](docs/execution-jobs.md).
+Only repositories with a matching operator-owned profile can be evaluated.
 
 ## Development checks
 
@@ -210,8 +258,37 @@ The default tests isolate storage in temporary SQLite databases. Set
 `CODEHOUND_TEST_POSTGRES_URL` to a **dedicated test database** to enable PostgreSQL
 integration checks. Set `CODEHOUND_TEST_IMAGE_ID` to the trusted Docker image ID to
 enable actual container tests. CI runs PostgreSQL and Docker integration jobs as
-well as frontend tests and the production build.
+well as frontend tests and the production build. The Docker job runs the complete
+backend suite so new container tests are included automatically. Live public
+repository checks remain explicitly enabled release checks; see the
+[MVP release checklist](docs/release.md).
 
-See [architecture and remaining boundaries](docs/architecture.md). Next: connect
-pinned checkout, trusted test environments, execution persistence, and the UI into
-a queued evaluation pipeline.
+See [architecture and remaining boundaries](docs/architecture.md) and the
+[dashboard walkthrough](docs/dashboard.md). Next: broaden independently retained
+test profiles and gather human-reviewed real agent patches. The
+[benchmark runner](docs/benchmark.md) provides reproducible experiment plumbing; its
+public synthetic corpus does not establish real-world detection performance.
+
+Further implementation details: [worker recovery](docs/worker-recovery.md),
+[deadline handling and retained evidence](docs/execution-deadlines.md),
+[loaded evaluator identity](docs/evaluator-provenance.md),
+[requirement evidence](docs/requirement-evidence.md), and
+[Python syntax/import impact](docs/python-impact.md).
+
+A real upstream workflow is documented in [the packaging reproduction](docs/real-repository.md).
+See [additional real tasks](docs/real-tasks.md) for Boltons reproductions and
+[the adversarial experiment](docs/real-experiment.md) for deliberately incorrect
+patches that pass visible and existing tests. These are public demonstration tasks,
+not a human-reviewed benchmark of AI-generated patches.
+See [frozen repository tests](docs/repository-tests.md) and
+[differential static analysis](docs/static-analysis.md) for trust boundaries and limits.
+
+An opt-in integration check covers public GitHub intake, the durable job queue,
+actual Docker execution, and owner-scoped evidence exports. It uses a synthetic
+session in an isolated test database, so it does not test browser OAuth:
+
+```sh
+CODEHOUND_TEST_IMAGE_ID="$CODEHOUND_IMAGE_ID" \
+CODEHOUND_RUN_PUBLIC_REPOSITORY_TESTS=1 \
+backend/.venv/bin/python -m pytest backend/tests/test_live_verification_flow.py -q
+```

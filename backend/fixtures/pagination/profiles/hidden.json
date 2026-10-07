@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "module": "pagination",
+  "function": "pages",
+  "timeout_seconds": 5,
+  "name": "pagination-hidden",
+  "cases": [
+    {
+      "id": "preserve-7-size-3",
+      "args": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        3
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            3,
+            4,
+            5
+          ],
+          [
+            6
+          ]
+        ]
+      }
+    },
+    {
+      "id": "preserve-1-size-10",
+      "args": [
+        [
+          0
+        ],
+        10
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "preserve-10-size-4",
+      "args": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        4
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            4,
+            5,
+            6,
+            7
+          ],
+          [
+            8,
+            9
+          ]
+        ]
+      }
+    },
+    {
+      "id": "preserve-0-size-2",
+      "args": [
+        [],
+        2
+      ],
+      "expect": {
+        "kind": "value",
+        "value": []
+      }
+    },
+    {
+      "id": "preserve-6-size-3",
+      "args": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        3
+      ],
+      "expect": {
+        "kind": "value",
+        "value": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            3,
+            4,
+            5
+          ]
+        ]
+      }
+    },
+    {
+      "id": "invalid-size-0",
+      "args": [
+        [
+          1,
+          2
+        ],
+        0
+      ],
+      "expect": {
+        "kind": "exception",
+        "exception": "ValueError"
+      }
+    },
+    {
+      "id": "invalid-size-1",
+      "args": [
+        [
+          1,
+          2
+        ],
+        -1
+      ],
+      "expect": {
+        "kind": "exception",
+        "exception": "ValueError"
+      }
+    }
+  ]
+}

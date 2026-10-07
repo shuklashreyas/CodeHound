@@ -11,17 +11,22 @@ type Repository = {
 };
 type Pull = { number: number; title: string; body: string; url: string };
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
 }
 
-export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const timeout = AbortSignal.timeout(20_000);
+export async function api<T>(
+  path: string,
+  options?: RequestInit,
+  timeoutMs = 20_000,
+): Promise<T> {
+  const timeout = AbortSignal.timeout(timeoutMs);
   const signal = options?.signal
     ? AbortSignal.any([options.signal, timeout])
     : timeout;
@@ -43,11 +48,24 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok || !data) {
-    throw new ApiError(
+    const retryHeader = response.headers.get("Retry-After");
+    const retryAfter =
+      retryHeader &&
+      /^[0-9]{1,5}$/.test(retryHeader) &&
+      Number(retryHeader) > 0 &&
+      Number(retryHeader) <= 86400
+        ? Number(retryHeader)
+        : undefined;
+    const message =
       typeof data?.detail === "string"
         ? data.detail
-        : "CodeHound returned an unexpected response. Please try again.",
+        : "CodeHound returned an unexpected response. Please try again.";
+    throw new ApiError(
+      response.status === 429 && retryAfter
+        ? `${message} Retry in ${retryAfter} seconds.`
+        : message,
       response.status,
+      retryAfter,
     );
   }
   return data as T;
@@ -145,6 +163,18 @@ export function GitHubAccount({
         </button>
       )}
     </div>
+  );
+}
+
+export function githubLoginUrl(search = window.location.search) {
+  const verification = new URLSearchParams(search).get("verification");
+  const identifier =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return (
+    "/api/auth/github/login" +
+    (verification && identifier.test(verification)
+      ? `?verification=${encodeURIComponent(verification)}`
+      : "")
   );
 }
 
@@ -281,9 +311,7 @@ export function GitHubRepositories({
           </p>
           <a
             className={`button primary ${!auth.session?.configured ? "unavailable" : ""}`}
-            href={
-              auth.session?.configured ? "/api/auth/github/login" : undefined
-            }
+            href={auth.session?.configured ? githubLoginUrl() : undefined}
             aria-disabled={!auth.session?.configured}
           >
             Continue with GitHub ↗

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-07T02:42:15.957326+00:00",
+  "repository": {
+    "id": 8307391,
+    "full_name": "mahmoud/boltons",
+    "private": false
+  },
+  "pull_request": {
+    "number": 418,
+    "title": "fix(strutils): stop singularize() mangling words ending in 'ss'",
+    "body": "## Summary\n\n`strutils.singularize()` corrupts words that are already singular and end in a double `s` (`glass`, `boss`, `class`, `kiss`, `address`, `business`, ...), returning `glas`, `bos`, `clas`, `kis`, `addres`, `busines`.\n\n```python\n>>> from boltons.strutils import singularize\n>>> singularize('glass')\n'glas'      # expected 'glass'\n>>> singularize('boss')\n'bos'       # expected 'boss'\n>>> singularize('address')\n'addres'    # expected 'address'\n```\n\n## Root cause\n\n`singularize()` ends with a catch-all that strips the final character from any word ending in `s` that didn't match the `-ies` / `-ses` branches:\n\n```python\nelif word.endswith('es') and word[-3] == 's':\n    singular = word[:-2]\nelse:\n    singular = word[:-1]      # <-- 'glass' -> 'glas'\n```\n\nNo English plural ends in `ss`. The plural of these words ends in `sses` (`glass` -> `glasses`), which is **already** handled correctly by the preceding `word.endswith('es') and word[-3] == 's'` branch. Only words that are *already singular* and end in `ss` fall through to the blind `word[:-1]`.\n\nThis also violated the idempotency implied by the function's own docstring (`singularize('Glasses') == 'Glass'`): feeding that canonical singular back in produced `'Glas'`, and applying `singularize()` defensively to an already-singular word degraded it further (`'boss'` -> `'bos'` -> `'bo'`).\n\n## Fix\n\nAdd an `elif word.endswith('ss')` guard before the final fallback that returns the word unchanged (+7 lines). Because the `-sses` branch runs first, real plurals are unaffected.\n\n## Before / after\n\n| input | before | after |\n|-------|--------|-------|\n| `glass` | `glas` | `glass` |\n| `boss` | `bos` | `boss` |\n| `class` | `clas` | `class` |\n| `kiss` | `kis` | `kiss` |\n| `address` | `addres` | `address` |\n| `business` | `busines` | `business` |\n| `glasses` (plural) | `glass` | `glass` *(unchanged)* |\n| `bosses` (plural) | `boss` | `boss` *(unchanged)* |\n| `chances`, `cats`, `activities` | correct | correct *(unchanged)* |\n\nThe single-`s` ambiguous cases (e.g. `bus`) are intentionally left alone \u2014 they are indistinguishable from a regular plural (`cats` -> `cat`) without a dictionary, so this PR does not touch them.\n\n## Tests\n\nAdded `test_singularize_double_s` covering the double-`s` singular words, case preservation (`Glass`, `BOSS`), the still-correct `-sses` plurals, and idempotency.\n\nProven to guard the bug (regression test fails on unpatched source, passes with the fix):\n\n```\n# source fix stashed, test kept:\n>   assert singularize('glass') == 'glass'\nE   AssertionError: assert 'glas' == 'glass'\n1 failed\n\n# fix restored:\n1 passed\n```\n\nFull suite: **438 passed** (was 437). All 28 `strutils` docstring doctests pass. No linter is configured in CI; the change is pure stdlib control flow valid on every supported Python (3.7-3.14).\n",
+    "url": "https://github.com/mahmoud/boltons/pull/418",
+    "state": "closed",
+    "merged": true
+  },
+  "base_target_sha": "979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe",
+  "base_sha": "979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe",
+  "head_sha": "168ef1575e2ccfb308d7892548c41d24fd251b26",
+  "head_repository": "Sanjays2402/boltons",
+  "base_ref": "master",
+  "head_ref": "fix/singularize-double-s",
+  "files": [
+    {
+      "filename": "boltons/strutils.py",
+      "previous_filename": null,
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0,
+      "changes": 7,
+      "sha": "5c829fec220f0d6814eff6e3c92fd5ef91f0b674",
+      "patch_available": true
+    },
+    {
+      "filename": "tests/test_strutils.py",
+      "previous_filename": null,
+      "status": "modified",
+      "additions": 25,
+      "deletions": 0,
+      "changes": 25,
+      "sha": "cbb7e74a90f12623310dfaeb44c7f53ea683dfcb",
+      "patch_available": true
+    }
+  ],
+  "diff": "diff --git a/boltons/strutils.py b/boltons/strutils.py\nindex 69484458..5c829fec 100644\n--- a/boltons/strutils.py\n+++ b/boltons/strutils.py\n@@ -227,6 +227,13 @@ def singularize(word):\n         singular = word[:-3] + 'y'\n     elif word.endswith('es') and word[-3] == 's':\n         singular = word[:-2]\n+    elif word.endswith('ss'):\n+        # Words ending in a double 's' (glass, boss, kiss) are already\n+        # singular; their plurals end in 'sses' and are handled above. Do\n+        # not blindly strip the trailing 's', which would produce 'glas',\n+        # 'bos', 'kis' and break idempotency (singularize('Glasses') ==\n+        # 'Glass', but 'Glass' must stay 'Glass').\n+        return orig_word\n     else:\n         singular = word[:-1]\n     return _match_case(orig_word, singular)\ndiff --git a/tests/test_strutils.py b/tests/test_strutils.py\nindex b46081e7..cbb7e74a 100644\n--- a/tests/test_strutils.py\n+++ b/tests/test_strutils.py\n@@ -274,3 +274,28 @@ def test_bytes2human():\n     assert b2h(-(1024 ** 2)) == '-1M'\n     # ndigits controls the fractional part.\n     assert b2h(1024, 2) == '1.00K'\n+\n+\n+def test_singularize_double_s():\n+    singularize = strutils.singularize\n+    # Words ending in a double 's' are already singular (their plurals end\n+    # in 'sses'), so singularize must not strip the trailing 's' and produce\n+    # 'glas'/'bos'/'kis'. Regression for the branch that blindly did word[:-1].\n+    assert singularize('glass') == 'glass'\n+    assert singularize('boss') == 'boss'\n+    assert singularize('class') == 'class'\n+    assert singularize('kiss') == 'kiss'\n+    assert singularize('address') == 'address'\n+    assert singularize('business') == 'business'\n+    # Case pattern is preserved, like the rest of singularize().\n+    assert singularize('Glass') == 'Glass'\n+    assert singularize('BOSS') == 'BOSS'\n+    # The real plurals of these words still singularize correctly (the 'sses'\n+    # -> 'ss' branch runs before the new guard, so nothing regresses).\n+    assert singularize('glasses') == 'glass'\n+    assert singularize('bosses') == 'boss'\n+    assert singularize('classes') == 'class'\n+    assert singularize('addresses') == 'address'\n+    # singularize() is now idempotent for these words: feeding its own output\n+    # back in is a no-op (previously 'Glasses' -> 'Glass' -> 'Glas').\n+    assert singularize(singularize('Glasses')) == 'Glass'\n",
+  "diff_sha256": "f8c880cd770b029696f9b48552e28e117de3146b9a7f0cca8ed248b2fa5bbf5f",
+  "summary": {
+    "files_changed": 2,
+    "additions": 32,
+    "deletions": 0
+  },
+  "observations": [
+    {
+      "kind": "test_file_changed",
+      "severity": "review",
+      "path": "tests/test_strutils.py",
+      "message": "A test file changed; review assertion strength and coverage."
+    }
+  ],
+  "limitations": [
+    "No repository code or tests have been executed.",
+    "Filename-based integrity observations are review hints, not verdicts.",
+    "GitHub diffs may omit binary contents; a checkout is required for execution.",
+    "Historical merged upstream patch used for behavior reproduction, not an AI-agent benchmark or labeled negative dataset."
+  ],
+  "provenance": {
+    "kind": "historical_upstream_patch",
+    "author": "Sanjays2402",
+    "merged": true,
+    "merged_at": "2026-07-17T08:11:30Z",
+    "pull_metadata_url": "https://api.github.com/repos/mahmoud/boltons/pulls/418",
+    "pull_metadata_sha256": "590ac1ed20fa1ce44e617769ac910cce604160073bb1ed5bc0df6f81dd1e3900",
+    "pinned_comparison_url": "https://api.github.com/repos/mahmoud/boltons/compare/979fa9b613fa8c0a455ae16ea6f2ec91c11ecafe...168ef1575e2ccfb308d7892548c41d24fd251b26",
+    "capture_method": "Normal historical public PR intake with original closed/merged metadata and immutable SHA comparison.",
+    "authorship_limit": "The author account is recorded; AI assistance and human review ground truth are not established by this metadata."
+  }
+}

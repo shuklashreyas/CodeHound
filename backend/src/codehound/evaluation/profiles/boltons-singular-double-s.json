@@ -1,0 +1,285 @@
+{
+  "id": "boltons-singular-double-s",
+  "label": "boltons PR #418 singularize regression",
+  "repository": "mahmoud/boltons",
+  "coverage": "Reproduce corruption of already-singular ss-ending words in singularize; preserve case and representative existing plural handling. Single-s ambiguous words and linguistic completeness are outside this contract. Operator-owned JSON expectations stay outside the candidate process. Public edge cases are not secret tests. Historical upstream reproduction does not establish AI authorship, review ground truth, or full repository correctness.",
+  "visible": {
+    "schema_version": 1,
+    "name": "boltons-singular-double-s-visible",
+    "module": "boltons.strutils",
+    "function": "singularize",
+    "source_directory": ".",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "preserve-glass",
+        "args": [
+          "glass"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "glass"
+        }
+      },
+      {
+        "id": "plural-glasses",
+        "args": [
+          "glasses"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "glass"
+        }
+      },
+      {
+        "id": "regular-plural",
+        "args": [
+          "cats"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "cat"
+        }
+      }
+    ]
+  },
+  "hidden": {
+    "schema_version": 1,
+    "name": "boltons-singular-double-s-independent",
+    "module": "boltons.strutils",
+    "function": "singularize",
+    "source_directory": ".",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "preserve-boss",
+        "args": [
+          "boss"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "boss"
+        }
+      },
+      {
+        "id": "preserve-class",
+        "args": [
+          "class"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "class"
+        }
+      },
+      {
+        "id": "preserve-kiss",
+        "args": [
+          "kiss"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "kiss"
+        }
+      },
+      {
+        "id": "preserve-address",
+        "args": [
+          "address"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "address"
+        }
+      },
+      {
+        "id": "preserve-business",
+        "args": [
+          "business"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "business"
+        }
+      },
+      {
+        "id": "preserve-title-case",
+        "args": [
+          "Glass"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "Glass"
+        }
+      },
+      {
+        "id": "preserve-uppercase",
+        "args": [
+          "BOSS"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "BOSS"
+        }
+      },
+      {
+        "id": "plural-bosses",
+        "args": [
+          "bosses"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "boss"
+        }
+      },
+      {
+        "id": "plural-addresses",
+        "args": [
+          "addresses"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "address"
+        }
+      },
+      {
+        "id": "plural-activities",
+        "args": [
+          "activities"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "activity"
+        }
+      },
+      {
+        "id": "regular-singular",
+        "args": [
+          "chance"
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": "chance"
+        }
+      },
+      {
+        "id": "empty",
+        "args": [
+          ""
+        ],
+        "kwargs": {},
+        "expect": {
+          "kind": "value",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "repository_tests": {
+    "test_paths": [
+      "tests/test_strutils.py"
+    ],
+    "source_directories": [
+      "."
+    ],
+    "target_packages": [
+      "boltons"
+    ],
+    "timeout_seconds": 120
+  },
+  "requirements": [
+    {
+      "id": "preserve-double-s-singular",
+      "description": "Leave representative already-singular words ending in ss unchanged.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "preserve-glass"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-boss"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-class"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-kiss"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-address"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-business"
+        }
+      ]
+    },
+    {
+      "id": "preserve-case",
+      "description": "Preserve title case and uppercase for already-singular ss endings.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "preserve-title-case"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-uppercase"
+        }
+      ]
+    },
+    {
+      "id": "preserve-existing-inflection",
+      "description": "Keep representative real plurals, ordinary singular words and the empty string working.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "plural-glasses"
+        },
+        {
+          "suite": "visible",
+          "case_id": "regular-plural"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "plural-bosses"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "plural-addresses"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "plural-activities"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "regular-singular"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "empty"
+        }
+      ]
+    }
+  ]
+}

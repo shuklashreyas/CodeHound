@@ -12,28 +12,47 @@ GitHub OAuth → public repository / PR selection
                         ↓ explicit intake API call
           immutable PR evidence + review observations
 
-captured PR → pinned Git workspaces → baseline/candidate Docker tests → JSON comparison
+captured PR → durable execution job → worker → pinned Git workspaces
+           → baseline/candidate Docker tests → stored comparison evidence
 trusted fixture code + independent tests → restricted Docker runner → JSON evidence
 ```
 
-The draft/intake flow is persisted. The operator comparison CLI connects checkout
-and execution; this is not yet a queued web evaluation job. The frontend clearly labels its sample
-report and keeps saved drafts unexecuted. None of these components implements a
-calibrated ML judge, static analyzer, or semantic requirement verifier yet.
+Drafts, intake, queued execution, cancellation, and results are persisted. The
+execution API accepts only a matching operator-owned profile ID. A separate worker
+claims jobs with expiring leases and keeps assertions outside candidate containers.
+The frontend connects this flow and keeps its illustrative sample separate from real execution evidence. None of these components implements a
+calibrated ML judge or semantic requirement verifier yet.
+Changed Python test structure is inspected in an isolated parser; see
+[test-integrity.md](test-integrity.md). Operator-defined requirements map to case
+outcomes and bounded expected/observed diagnostics. Python source inspection supplies
+syntax/import-impact evidence, while isolated, pinned Ruff E/F checks separate new
+findings from existing and resolved findings. See [static analysis](static-analysis.md).
+These mechanisms do not establish complete semantic issue coverage.
+
+Operator-selected existing pytest files are frozen from the baseline and run against
+both revisions. These [repository tests](repository-tests.md) carry lower trust than
+external JSON assertions: repository code shares their process and may manipulate
+the framework. Their results do not override independent behavioral judgments.
 
 ## Components
 
 - `api`: authentication, owner-scoped verification endpoints, readiness.
-- `db`: SQLAlchemy storage, Alembic migrations, short transactions, intake leases.
+- `db`: SQLAlchemy storage, migrations, short transactions, intake/execution leases.
 - `repositories`: strict URL validation, bounded GitHub requests, snapshot capture,
   and temporary Git workspaces pinned to exact commits.
 - `evaluation`: submission/report contracts and explicit unrun check states.
-- `execution`: operator-controlled Python Docker runner, baseline comparison CLI, and fixture demo.
+- `execution`: independent evaluator, restricted Docker runner, worker, comparison CLI.
 - `data/`: ignored local SQLite database and local evidence files.
 
 SQLite keeps development usable without Docker. Compose uses PostgreSQL. Execution
 images are built from trusted definitions, resolved to immutable local IDs, and
 never selected or built from untrusted HTTP input.
+
+Profiles may pin separate trusted images for different dependency environments.
+Named evaluator controllers also bind their loaded Python code to source at import
+and reject source changes before publishing evidence. Reports retain relative source
+hashes and the host Python runtime identity. See [evaluator provenance](evaluator-provenance.md)
+for the boundary: this does not attest every host dependency or a compromised host.
 
 ## Isolation
 
@@ -50,21 +69,33 @@ not mount the host Docker socket or pass host credentials into the container.
 Candidate pytest config and conftest files do not control test discovery. Both an
 in-container deadline and an outer watchdog bound runtime; output is capped and
 container removal is attempted in a final cleanup block. Host or daemon failure
-can interrupt cleanup; production workers also need orphan-container reconciliation.
+can interrupt cleanup; the worker reconciles aged resources by database namespace
+and execution claim after recovery. See [worker-recovery.md](worker-recovery.md).
 
 Python under test still shares a process with pytest. It can attempt to manipulate
 the test framework or terminate the process. Exit codes and logs are evidence, not
-proof against adversarial code. External test protocols and stronger sandboxing
-remain necessary before claiming adversarial robustness.
+proof against adversarial code. The JSON function evaluator keeps assertions and
+expected answers outside the candidate container. Its narrower contract and remaining limits are
+documented in `independent-evaluator.md`; arbitrary pytest does not gain that boundary.
 
 ## Authentication
 
-OAuth state and PKCE bind sign-in to a browser. Access tokens are stored only in
-process-local server sessions; the browser gets an opaque HttpOnly cookie. HTTPS
-origins use Secure cookies. Requests that mutate records require a custom header
-and the configured origin. Public-only constraints apply to metadata and PR intake.
-Saved ownership uses immutable GitHub IDs. Restarting the API signs users out but
-does not delete saved drafts. Multi-worker deployments need a shared session store.
+OAuth state and PKCE bind sign-in to a browser. Access tokens remain server-side;
+the browser gets an opaque HttpOnly cookie. HTTPS origins use Secure cookies.
+The default local session store uses process memory. An operator can configure a
+shared encryption key to enable [encrypted database sessions](shared-sessions.md),
+atomic single-use OAuth flows, and revocation across workers. Wrong keys and
+database failures fail closed; keys are never supplied to candidate containers.
+
+Requests that mutate records require a custom header and the configured origin.
+Database-backed [request limits](request-limits.md) bound OAuth login and account
+mutations. Documented startup disables proxy-header trust to prevent forged client
+addresses from bypassing login limits. Public-only constraints apply to metadata
+and PR intake. Saved ownership uses immutable GitHub IDs.
+
+Separate [retained-record limits](storage-limits.md) count verifications and execution
+history in their insertion transactions. Idempotent retries remain available at
+capacity. These limits do not delete history or impose filesystem byte quotas.
 
 ## Research evaluation
 
@@ -73,14 +104,24 @@ related tasks and patches together to avoid leakage. Measure false positives as
 well as detection among visible-test-passing patches. Retain human-reviewed labels,
 baseline failures, environment identities, and reproducible artifacts.
 
-The pagination fixture is public and synthetic. It demonstrates a correct fix
-versus an overfit one, not a benchmark result. Numerical confidence requires
-calibration against independently labeled data.
+The 12-patch corpus is public and synthetic. It demonstrates correct fixes,
+overfitting, regressions, and unchanged implementations across three task families.
+The [benchmark runner](benchmark.md) retains labels, abstentions, false positives,
+split-aware metrics, and immutable input identities. It does not establish real
+agent performance. Numerical confidence requires independent calibration data.
+
+Three pinned historical upstream tasks now exercise packaging and Boltons through
+real public GitHub checkout, independent contracts, and frozen repository tests.
+The [real task reproductions](real-tasks.md) retain exact revisions and evidence
+identities; upstream authorship method is not established. A separate
+[packaging mutation experiment](real-experiment.md) catches two deliberately bad
+patches that pass visible cases and all 54 existing tests. Those synthetic negatives
+demonstrate the mechanism; they do not measure accuracy on real agent patches.
 
 ## Next milestones
 
-1. Queue evaluation jobs and connect checkout, trusted environments, and execution.
-2. Persist original/candidate test evidence with baseline comparisons and retries.
-3. Add structural test-integrity analysis and actual static-analysis results.
-4. Populate the dashboard from real reports, including progress and failure states.
-5. Build a labeled benchmark before training learned evaluators.
+1. Gather human-reviewed real agent patches and held-out evaluation tasks.
+2. Add operator-owned profiles for more repository contracts and languages.
+3. Broaden structural integrity and static analysis beyond Python AST and Ruff E/F.
+4. Harden worker storage quotas and deployment isolation.
+5. Compare stronger baselines and calibrate learned evaluators only with sufficient data.

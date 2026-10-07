@@ -1,0 +1,339 @@
+{
+  "id": "packaging-name-validation",
+  "label": "packaging PR #925 name validation regression",
+  "repository": "pypa/packaging",
+  "coverage": "Historical upstream PR #925 with unknown authorship method; smoke test for canonicalize_name(name, validate=True). Checks trailing-newline rejection, representative name normalization, existing invalid-input handling, and the optional-validation default behavior. JSON expectations remain in the operator process. Bundled hidden cases are public independent edge cases, not secret tests. This is not an agent benchmark and does not establish full packaging correctness.",
+  "visible": {
+    "schema_version": 1,
+    "name": "packaging-name-visible",
+    "module": "packaging.utils",
+    "function": "canonicalize_name",
+    "source_directory": "src",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "reject-trailing-lf",
+        "args": [
+          "Friendly_Bard\n"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "normalize-separator-runs",
+        "args": [
+          "FrIeNdLy-._.-bArD"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "value",
+          "value": "friendly-bard"
+        }
+      },
+      {
+        "id": "optional-validation",
+        "args": [
+          "_not_legal"
+        ],
+        "kwargs": {
+          "validate": false
+        },
+        "expect": {
+          "kind": "value",
+          "value": "-not-legal"
+        }
+      }
+    ]
+  },
+  "hidden": {
+    "schema_version": 1,
+    "name": "packaging-name-independent",
+    "module": "packaging.utils",
+    "function": "canonicalize_name",
+    "source_directory": "src",
+    "result_encoding": "json",
+    "timeout_seconds": 5,
+    "cases": [
+      {
+        "id": "reject-single-char-lf",
+        "args": [
+          "A\n"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-mixed-name-lf",
+        "args": [
+          "Release.v2_9\n"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-leading-lf",
+        "args": [
+          "\nlegal"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-inner-lf",
+        "args": [
+          "le\ngal"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-crlf",
+        "args": [
+          "legal\r\n"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-trailing-cr",
+        "args": [
+          "legal\r"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-empty",
+        "args": [
+          ""
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-trailing-punctuation",
+        "args": [
+          "legal-"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "reject-slash",
+        "args": [
+          "legal/name"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "exception",
+          "exception": "packaging.utils.InvalidName"
+        }
+      },
+      {
+        "id": "normalize-single-char",
+        "args": [
+          "Z"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "value",
+          "value": "z"
+        }
+      },
+      {
+        "id": "preserve-digit",
+        "args": [
+          "7"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "value",
+          "value": "7"
+        }
+      },
+      {
+        "id": "normalize-valid-mixed",
+        "args": [
+          "Package__Name...2"
+        ],
+        "kwargs": {
+          "validate": true
+        },
+        "expect": {
+          "kind": "value",
+          "value": "package-name-2"
+        }
+      },
+      {
+        "id": "preserve-unvalidated-newline",
+        "args": [
+          "MiXeD_Name\n"
+        ],
+        "kwargs": {
+          "validate": false
+        },
+        "expect": {
+          "kind": "value",
+          "value": "mixed-name\n"
+        }
+      }
+    ]
+  },
+  "repository_tests": {
+    "test_paths": [
+      "tests/test_utils.py"
+    ],
+    "source_directories": [
+      "src",
+      "."
+    ],
+    "target_packages": [
+      "packaging"
+    ],
+    "timeout_seconds": 120
+  },
+  "requirements": [
+    {
+      "id": "reject-trailing-newline",
+      "description": "When validation is enabled, reject names ending in LF, including a single-character name and names containing valid separators.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "reject-trailing-lf"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-single-char-lf"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-mixed-name-lf"
+        }
+      ]
+    },
+    {
+      "id": "preserve-normalization",
+      "description": "Keep representative valid names working and lowercase names while collapsing runs of hyphens, underscores and periods.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "normalize-separator-runs"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "normalize-single-char"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-digit"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "normalize-valid-mixed"
+        }
+      ]
+    },
+    {
+      "id": "preserve-invalid-input-rejection",
+      "description": "Keep rejection of representative invalid names when validation is enabled.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "reject-leading-lf"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-inner-lf"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-crlf"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-trailing-cr"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-empty"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-trailing-punctuation"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "reject-slash"
+        }
+      ]
+    },
+    {
+      "id": "preserve-optional-validation",
+      "description": "When validation is disabled, normalize rather than reject representative invalid names; preserve a newline in the returned string.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "optional-validation"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "preserve-unvalidated-newline"
+        }
+      ]
+    }
+  ]
+}

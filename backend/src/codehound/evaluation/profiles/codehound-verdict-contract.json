@@ -1,0 +1,479 @@
+{
+  "id": "codehound-verdict-contract",
+  "label": "CodeHound comparison verdict contract",
+  "repository": "shuklashreyas/CodeHound",
+  "coverage": "Checks aggregation of structured visible and independent outcomes: regression priority, unresolved checks, incomplete evidence, and improvement signals. Does not validate individual test execution, all comparison logic, or full issue requirements. Requires summarize_comparisons in both pinned revisions; a missing target is inconclusive. These cases are public dogfooding fixtures.",
+  "visible": {
+    "schema_version": 1,
+    "module": "codehound.execution.results",
+    "function": "summarize_comparisons",
+    "source_directory": "backend/src",
+    "timeout_seconds": 5,
+    "name": "verdict-visible",
+    "cases": [
+      {
+        "id": "unchanged-visible",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "no_behavior_change_observed",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "no_behavior_change_observed",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "visible-improvement",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "candidate_improves",
+                "improvements": [
+                  {
+                    "nodeid": "one",
+                    "before": "failed",
+                    "after": "passed"
+                  }
+                ],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "candidate_improves",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "visible-incomplete",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "incomplete",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": [
+                  {
+                    "nodeid": "three",
+                    "before": "failed",
+                    "after": "failed"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "incomplete",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      }
+    ]
+  },
+  "hidden": {
+    "schema_version": 1,
+    "module": "codehound.execution.results",
+    "function": "summarize_comparisons",
+    "source_directory": "backend/src",
+    "timeout_seconds": 5,
+    "name": "verdict-independent",
+    "cases": [
+      {
+        "id": "hidden-regression-dominates",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "candidate_improves",
+                "improvements": [
+                  {
+                    "nodeid": "one",
+                    "before": "failed",
+                    "after": "passed"
+                  }
+                ],
+                "regressions": [],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "regression_detected",
+                "improvements": [],
+                "regressions": [
+                  {
+                    "nodeid": "two",
+                    "before": "passed",
+                    "after": "failed"
+                  }
+                ],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "regression_detected",
+            "signals": [
+              "visible_improvement_with_independent_regression"
+            ],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "hidden-unresolved-dominates",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "candidate_improves",
+                "improvements": [
+                  {
+                    "nodeid": "one",
+                    "before": "failed",
+                    "after": "passed"
+                  }
+                ],
+                "regressions": [],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "incomplete",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": [
+                  {
+                    "nodeid": "three",
+                    "before": "failed",
+                    "after": "failed"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "incomplete",
+            "signals": [
+              "visible_improvement_with_unresolved_independent_tests"
+            ],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "incomplete-evidence-blocks-improvement",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "candidate_improves",
+                "improvements": [
+                  {
+                    "nodeid": "one",
+                    "before": "failed",
+                    "after": "passed"
+                  }
+                ],
+                "regressions": [],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "inconclusive",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "inconclusive",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "regression-survives-incomplete-evidence",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "regression_detected",
+                "improvements": [],
+                "regressions": [
+                  {
+                    "nodeid": "two",
+                    "before": "passed",
+                    "after": "failed"
+                  }
+                ],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "inconclusive",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "regression_detected",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "hidden-only-regression",
+        "args": [
+          {
+            "hidden": {
+              "test_comparison": {
+                "verdict": "regression_detected",
+                "improvements": [],
+                "regressions": [
+                  {
+                    "nodeid": "two",
+                    "before": "passed",
+                    "after": "failed"
+                  }
+                ],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "regression_detected",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "hidden-improvement",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "no_behavior_change_observed",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "candidate_improves",
+                "improvements": [
+                  {
+                    "nodeid": "one",
+                    "before": "failed",
+                    "after": "passed"
+                  }
+                ],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "candidate_improves",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "both-unchanged",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "no_behavior_change_observed",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            },
+            "hidden": {
+              "test_comparison": {
+                "verdict": "no_behavior_change_observed",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "no_behavior_change_observed",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "no-suites",
+        "args": [
+          {}
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "inconclusive",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      },
+      {
+        "id": "unknown-verdict",
+        "args": [
+          {
+            "visible": {
+              "test_comparison": {
+                "verdict": "unsupported",
+                "improvements": [],
+                "regressions": [],
+                "unresolved": []
+              }
+            }
+          }
+        ],
+        "expect": {
+          "kind": "value",
+          "value": {
+            "verdict": "inconclusive",
+            "signals": [],
+            "confidence": null
+          }
+        }
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "id": "basic-verdicts",
+      "description": "Preserve visible improvement, unchanged behavior, and unresolved failures.",
+      "cases": [
+        {
+          "suite": "visible",
+          "case_id": "unchanged-visible"
+        },
+        {
+          "suite": "visible",
+          "case_id": "visible-improvement"
+        },
+        {
+          "suite": "visible",
+          "case_id": "visible-incomplete"
+        }
+      ]
+    },
+    {
+      "id": "independent-priority",
+      "description": "Independent regressions and unresolved failures override visible improvement and retain the corresponding signal.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "hidden-regression-dominates"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "hidden-unresolved-dominates"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "regression-survives-incomplete-evidence"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "hidden-only-regression"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty",
+      "description": "Incomplete, absent, or unrecognized evidence cannot claim improvement.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "incomplete-evidence-blocks-improvement"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "no-suites"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "unknown-verdict"
+        }
+      ]
+    },
+    {
+      "id": "independent-improvement",
+      "description": "Retain independent improvements and distinguish them from unchanged behavior.",
+      "cases": [
+        {
+          "suite": "hidden",
+          "case_id": "hidden-improvement"
+        },
+        {
+          "suite": "hidden",
+          "case_id": "both-unchanged"
+        }
+      ]
+    }
+  ]
+}
