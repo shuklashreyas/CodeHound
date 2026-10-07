@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "name": "pytest task-level public API development probes",
+  "purpose": "development_pilot",
+  "adapter": "benchmarks/probes/pytest_task_adapter.py",
+  "tasks": [
+    {
+      "task_id": "pytest-dev__pytest-10051",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "aa55975c7d3f6c9f6d7f68accc41bb7cadf0eb9a",
+      "issue_sha256": "c8f618a73662951809b75d56e2f6743203138a82223c2a963e6de26f2fa3199c",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "before_consistent": true,
+        "after_clear_empty": true,
+        "after_consistent": true,
+        "after_messages": [
+          "after"
+        ],
+        "pytest_exit": 0
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public pytest.main runs an issue-derived caplog fixture example.",
+        "Host compares before/after-clear get_records consistency, empty records, and new-message visibility. No correctness assertion is placed in candidate pytest tests."
+      ]
+    },
+    {
+      "task_id": "pytest-dev__pytest-10081",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "da9a2b584eb7a6c7e924b2621ed0ddaeca0a7bea",
+      "issue_sha256": "591d6bb69d71666bdd35a3144c95f3d689544055966393676fd23f260f707571",
+      "supported": false,
+      "unsupported_reason": "interactive_debugger_lifecycle_not_probed",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Issue requires interactive --pdb lifecycle and unittest.skip class teardown behavior.",
+        "No debugger-control substitute is authored in this block; unsupported rather than inferring an outcome."
+      ]
+    },
+    {
+      "task_id": "pytest-dev__pytest-10356",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "3c1534944cbd34e8a41bc9e76818018fadefc9a1",
+      "issue_sha256": "04324b4ba13d4d4a7c28e790561dc0927851fc39eb3d245b2e688bb6a0de3174",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "TestBoth": [
+          "bar",
+          "foo"
+        ],
+        "TestReverse": [
+          "bar",
+          "foo"
+        ],
+        "TestSingle": [
+          "foo"
+        ],
+        "TestOwn": [
+          "bar",
+          "foo",
+          "own"
+        ],
+        "pytest_exit": 0
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public pytest collection hook observes iter_markers for two-base, reverse-base, single-base, and directly marked subclasses.",
+        "Marker names are sorted but not deduplicated, preserving duplicate-marker regressions."
+      ]
+    },
+    {
+      "task_id": "pytest-dev__pytest-5262",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "58e6a09db49f34886ff13f3b7520dd0bcd7063cd",
+      "issue_sha256": "d957354242a7a545699ec4d161c3e4c6ab6df9288000d6e46a051b8b7ff50301",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "mode_is_text": true,
+        "mode_selected_unicode_write": true,
+        "unicode_roundtrip": true,
+        "direct_text_write": true,
+        "pytest_exit": 0
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "A public pytest.main test observes sys.stdout.mode under the capfd fixture.",
+        "The output client branches on binary/text mode as the reported youtube-dl client did. Unicode round-trip and direct text writes are controls; youtube-dl/network are not needed."
+      ]
+    },
+    {
+      "task_id": "pytest-dev__pytest-5631",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "cb828ebe70b4fa35cd5f9a7ee024272237eab351",
+      "issue_sha256": "1e9120fbb21d881c388af3596eaa479bad2f604703eb79bd19898b5d7b18af03",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "numpy_two_values": [
+          -5.5,
+          3.0
+        ],
+        "numpy_one_value": [
+          2.0
+        ],
+        "explicit_number": 42,
+        "default_mock_injected": true,
+        "pytest_exit": 0
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public pytest collection/execution uses actual NumPy arrays in unittest.mock.patch new values.",
+        "Two-element issue array, single-element array, explicit scalar replacement and default injected mock are controls.",
+        "A collection error is an observed failure, not a passed run."
+      ]
+    },
+    {
+      "task_id": "pytest-dev__pytest-5787",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "955e54221008aba577ecbaefa15679f6777d3bf8",
+      "issue_sha256": "3837cd101981ed22a8c48e65978c0784010ef055a815f30371345aa1220f520e",
+      "supported": false,
+      "unsupported_reason": "xdist_exception_serialization_runtime_not_probed",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and pinned baseline package/dependency layout; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Issue concerns chained exception serialization across pytest-xdist workers.",
+        "No xdist-compatible worker/runtime or wire-serialization experiment is authored in this block. A local pretty traceback alone would not reproduce the reported failure."
+      ]
+    }
+  ],
+  "limitations": [
+    "No human verdicts are provided or inferred.",
+    "Selected pytest examples are executed inside candidate containers; host compares emitted observations.",
+    "Pinned dependencies enable historical source layouts; no repository setup or candidate import runs on the host.",
+    "--assert=plain and disabled plugin autoload avoid unrelated runtime/third-party behavior; probes do not establish complete task correctness.",
+    "Fresh checkouts lack setuptools-scm generated _pytest._version. Adapter supplies only explicit 0.0.0/tuple metadata in memory; no source file, setup step, or behavioral fix is added."
+  ]
+}
