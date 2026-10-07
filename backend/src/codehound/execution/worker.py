@@ -21,10 +21,12 @@ from codehound.execution.docker import control
 from codehound.execution.impact import analyze_python_impact
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.integrity import analyze_test_integrity
+from codehound.execution.provenance import EvaluatorChanged, bind_source, guard_evaluator
 from codehound.execution.static_analysis import analyze_static
 from codehound.execution.verify import verify_snapshot
 from codehound.repositories.checkout import CheckoutFailure
 
+_SOURCE_BINDING = bind_source(__file__)
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +34,22 @@ class WorkerInterrupted(Exception):
     pass
 
 
+@guard_evaluator(
+    "execution/worker.py",
+    "execution/verify.py",
+    "execution/independent.py",
+    "execution/static_analysis.py",
+    "execution/integrity.py",
+    "execution/impact.py",
+    "execution/repository_tests.py",
+    "execution/docker.py",
+    "execution/profiles.py",
+    "execution/protocol.py",
+    "execution/results.py",
+    "execution/deadlines.py",
+    "execution/inspection/static_ruff.py",
+    "evaluation/requirements.py",
+)
 async def execute_job(job, database, executor=verify_snapshot):
     profile = EvaluationProfile.model_validate(job.profile_snapshot)
     record = await run_in_threadpool(
@@ -114,6 +132,11 @@ async def process_job(job, database, stop, *, execute=execute_job, heartbeat_sec
         failure = {"code": "lease_lost", "message": "The execution lease expired."}
     except CheckoutFailure:
         failure = {"code": "checkout_failed", "message": "Pinned revisions could not be prepared."}
+    except EvaluatorChanged:
+        failure = {
+            "code": "evaluator_changed",
+            "message": "Trusted evaluator sources changed. Restart the worker before retrying.",
+        }
     except TimeoutError:
         failure = {"code": "execution_timeout", "message": "Execution exceeded its deadline."}
     except Exception:

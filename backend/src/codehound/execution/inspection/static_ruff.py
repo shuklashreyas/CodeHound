@@ -14,6 +14,12 @@ import time
 import tokenize
 from pathlib import Path
 
+if __name__ != "__main__":
+    # The controller imports shared constants; the isolated container needs only stdlib.
+    from codehound.execution.provenance import bind_source
+
+    _SOURCE_BINDING = bind_source(__file__)
+
 PREFIX = "CODEHOUND_STATIC_V1:"
 VERSION = "0.11.13"
 FLAGS = [

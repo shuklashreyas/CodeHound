@@ -10,6 +10,9 @@ from uuid import uuid4
 
 from codehound.execution.docker import ContainerRunner
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source, guard_evaluator
+
+_SOURCE_BINDING = bind_source(__file__)
 
 PREFIX = "CODEHOUND_STRUCTURE_V1:"
 STATUSES = {
@@ -187,6 +190,9 @@ def compare_structure(changes, baseline, candidate):
     return findings, unverified
 
 
+@guard_evaluator(
+    "execution/integrity.py", "execution/docker.py", "execution/results.py", "execution/protocol.py"
+)
 async def analyze_test_integrity(snapshot, checkouts, image_id, *, inspect=inspect_revision):
     changes = selected_files(snapshot.get("files", []))
     result = {

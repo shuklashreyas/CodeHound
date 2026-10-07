@@ -9,6 +9,9 @@ from uuid import uuid4
 
 from codehound.execution.docker import ContainerRunner
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source, guard_evaluator
+
+_SOURCE_BINDING = bind_source(__file__)
 
 PREFIX = "CODEHOUND_PYTHON_REPOSITORY_V1:"
 LIMITATIONS = [
@@ -258,6 +261,9 @@ def compare_repositories(snapshot, baseline, candidate):
     }
 
 
+@guard_evaluator(
+    "execution/impact.py", "execution/docker.py", "execution/results.py", "execution/protocol.py"
+)
 async def analyze_python_impact(snapshot, checkouts, image_id, *, inspect=inspect_repository):
     source = Path(__file__).parent / "inspection" / "python_repository.py"
 

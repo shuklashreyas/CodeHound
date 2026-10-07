@@ -17,7 +17,15 @@ from pathlib import Path
 from uuid import uuid4
 
 from codehound.core.execution_scope import current_scope
+from codehound.execution.provenance import bind_source, controller_binding
 from codehound.execution.results import PREFIX, decode_report
+
+_SOURCE_BINDING = bind_source(__file__)
+CONTROLLERS = (
+    "execution/docker.py",
+    "execution/protocol.py",
+    "execution/results.py",
+)
 
 
 @dataclass(frozen=True)
@@ -40,6 +48,7 @@ class ExecutionResult:
     evidence_source: str = "in_process_pytest"
     call_response: dict | None = None
     case_evidence: list[dict] | None = None
+    controller_binding: dict | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -160,6 +169,12 @@ class ContainerRunner:
         return args
 
     async def run_container(self, workspace, mounts, command, *, input_data=None):
+        controller = controller_binding(CONTROLLERS)
+        result = await self._run_container(workspace, mounts, command, input_data=input_data)
+        controller.ensure_current()
+        return replace(result, controller_binding=controller.to_dict())
+
+    async def _run_container(self, workspace, mounts, command, *, input_data=None):
         name = f"codehound-{uuid4().hex}"
         args = self.container_args(
             name, workspace, mounts, command, interactive=input_data is not None
@@ -302,10 +317,13 @@ class DockerRunner(ContainerRunner):
         )
 
     async def run(self, workspace: Path, tests: Path):
+        controller = controller_binding(CONTROLLERS)
         token = uuid4().hex
         harness = Path(__file__).parent
         before = hashlib.sha256(
-            (harness / "pytest_runner.py").read_bytes() + (harness / "pytest.ini").read_bytes()
+            controller.to_dict()["sha256"].encode()
+            + (harness / "pytest_runner.py").read_bytes()
+            + (harness / "pytest.ini").read_bytes()
         ).hexdigest()
         result = await self.run_container(
             workspace,
@@ -319,10 +337,18 @@ class DockerRunner(ContainerRunner):
                 line for line in output.splitlines() if not line.startswith(PREFIX + token + ":")
             )
         after = hashlib.sha256(
-            (harness / "pytest_runner.py").read_bytes() + (harness / "pytest.ini").read_bytes()
+            controller.to_dict()["sha256"].encode()
+            + (harness / "pytest_runner.py").read_bytes()
+            + (harness / "pytest.ini").read_bytes()
         ).hexdigest()
         if before != after:
             report, error = None, "evaluator_changed"
+        controller.ensure_current()
         return replace(
-            result, stdout=output, test_report=report, evidence_error=error, evaluator_sha256=before
+            result,
+            stdout=output,
+            test_report=report,
+            evidence_error=error,
+            evaluator_sha256=before,
+            controller_binding=controller.to_dict(),
         )

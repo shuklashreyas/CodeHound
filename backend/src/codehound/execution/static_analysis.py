@@ -12,6 +12,9 @@ from uuid import uuid4
 from codehound.execution.docker import ContainerRunner
 from codehound.execution.inspection.static_ruff import FLAGS, LIMITS, PREFIX, VERSION, safe_path
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source, guard_evaluator
+
+_SOURCE_BINDING = bind_source(__file__)
 
 LIMITATIONS = [
     "Only bounded regular Python .py/.pyi files are checked with Ruff E/F rules; .git is excluded.",
@@ -214,6 +217,13 @@ def compare_findings(snapshot, baseline, candidate):
     }
 
 
+@guard_evaluator(
+    "execution/static_analysis.py",
+    "execution/docker.py",
+    "execution/results.py",
+    "execution/protocol.py",
+    "execution/inspection/static_ruff.py",
+)
 async def analyze_static(snapshot, checkouts, image_id, *, inspect=inspect_static):
     sources = [Path(__file__), Path(__file__).parent / "inspection" / "static_ruff.py"]
 

@@ -33,7 +33,7 @@ def test_operator_verdict_profile_runs_through_external_json_contract(tmp_path):
     source = Path(__file__).parents[1] / "src" / "codehound" / "execution"
     package = tmp_path / "backend" / "src" / "codehound" / "execution"
     package.mkdir(parents=True)
-    for name in ("results.py", "protocol.py"):
+    for name in ("results.py", "protocol.py", "provenance.py"):
         shutil.copyfile(source / name, package / name)
     tmp_path.chmod(0o755)
 

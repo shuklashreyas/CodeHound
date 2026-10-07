@@ -5,6 +5,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
+
 SOFT_TIMEOUT_SECONDS = 560
 HARD_TIMEOUT_SECONDS = 600
 SUITE_CLEANUP_SECONDS = 20

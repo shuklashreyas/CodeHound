@@ -7,6 +7,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
+
 SYMBOL = r"^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$"
 
 

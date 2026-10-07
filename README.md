@@ -268,6 +268,7 @@ public synthetic corpus does not establish real-world detection performance.
 
 Further implementation details: [worker recovery](docs/worker-recovery.md),
 [deadline handling and retained evidence](docs/execution-deadlines.md),
+[loaded evaluator identity](docs/evaluator-provenance.md),
 [requirement evidence](docs/requirement-evidence.md), and
 [Python syntax/import impact](docs/python-impact.md).
 

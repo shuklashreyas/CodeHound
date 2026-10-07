@@ -2,7 +2,10 @@
 
 import json
 
+from codehound.execution.provenance import bind_source
 from codehound.execution.results import validate_report
+
+_SOURCE_BINDING = bind_source(__file__)
 
 
 def case_outcomes(run):

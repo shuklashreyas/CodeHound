@@ -48,6 +48,12 @@ SQLite keeps development usable without Docker. Compose uses PostgreSQL. Executi
 images are built from trusted definitions, resolved to immutable local IDs, and
 never selected or built from untrusted HTTP input.
 
+Profiles may pin separate trusted images for different dependency environments.
+Named evaluator controllers also bind their loaded Python code to source at import
+and reject source changes before publishing evidence. Reports retain relative source
+hashes and the host Python runtime identity. See [evaluator provenance](evaluator-provenance.md)
+for the boundary: this does not attest every host dependency or a compromised host.
+
 ## Isolation
 
 Git fetches public commit SHAs without inheriting credentials, Git configuration,

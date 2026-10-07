@@ -9,6 +9,9 @@ import binascii
 from collections import Counter
 
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
 
 PREFIX = "CODEHOUND_TEST_REPORT_V1:"
 MAX_TESTS = 10000

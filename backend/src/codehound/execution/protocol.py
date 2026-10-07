@@ -3,6 +3,10 @@
 import json
 import math
 
+from codehound.execution.provenance import bind_source
+
+_SOURCE_BINDING = bind_source(__file__)
+
 MAX_JSON_DEPTH = 64
 
 

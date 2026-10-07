@@ -16,6 +16,17 @@ from codehound.execution.deadlines import SUITE_CLEANUP_SECONDS, current_budget
 from codehound.execution.docker import ContainerRunner, ExecutionResult
 from codehound.execution.profiles import TrustedSuite
 from codehound.execution.protocol import load_evidence
+from codehound.execution.provenance import bind_source, controller_binding, read_trusted_source
+
+_SOURCE_BINDING = bind_source(__file__)
+CONTROLLERS = (
+    "execution/independent.py",
+    "execution/docker.py",
+    "execution/profiles.py",
+    "execution/results.py",
+    "execution/protocol.py",
+    "execution/deadlines.py",
+)
 
 CALL_PREFIX = "CODEHOUND_CALL_V1:"
 JSON_VALUE = TypeAdapter(JsonValue)
@@ -133,14 +144,13 @@ class IndependentRunner(ContainerRunner):
         )
 
     async def run(self, workspace: Path, profile: TrustedSuite):
+        controller = controller_binding(CONTROLLERS)
         # Freeze the trusted profile before sending any inputs to candidate processes.
         profile = TrustedSuite.model_validate_json(profile.canonical_bytes())
+        adapter = Path(__file__).parent / "adapters" / "call_adapter.py"
+        adapter_source = read_trusted_source(adapter)
         evaluator = hashlib.sha256(
-            Path(__file__).read_bytes()
-            + (Path(__file__).parent / "adapters" / "call_adapter.py").read_bytes()
-            + (Path(__file__).parent / "protocol.py").read_bytes()
-            + (Path(__file__).parent / "deadlines.py").read_bytes()
-            + profile.canonical_bytes()
+            controller.to_dict()["sha256"].encode() + adapter_source + profile.canonical_bytes()
         ).hexdigest()
         runner = IndependentRunner(
             self.image_id,
@@ -202,6 +212,11 @@ class IndependentRunner(ContainerRunner):
             "tests": tests,
             "collection_errors": [],
         }
+        controller.ensure_current()
+        if read_trusted_source(adapter) != adapter_source:
+            from codehound.execution.provenance import EvaluatorChanged
+
+            raise EvaluatorChanged()
         return ExecutionResult(
             status,
             exit_code,
@@ -216,4 +231,5 @@ class IndependentRunner(ContainerRunner):
             evaluator_sha256=evaluator,
             evidence_source="external_json_assertions",
             case_evidence=evidence,
+            controller_binding=controller.to_dict(),
         )

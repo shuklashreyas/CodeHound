@@ -18,8 +18,17 @@ from pydantic import Field, model_validator
 
 from codehound.execution.docker import ContainerRunner, ExecutionResult
 from codehound.execution.profiles import Contract
+from codehound.execution.provenance import bind_source, controller_binding, guard_evaluator
 from codehound.execution.results import PREFIX, compare_tests, decode_report
 
+_SOURCE_BINDING = bind_source(__file__)
+CONTROLLERS = (
+    "execution/repository_tests.py",
+    "execution/profiles.py",
+    "execution/docker.py",
+    "execution/results.py",
+    "execution/protocol.py",
+)
 SOURCE = "repository_controlled_in_process_pytest"
 IMPORT_PREFIX = "CODEHOUND_REPOSITORY_IMPORTS_V1:"
 MAX_FILES = 10000
@@ -253,12 +262,14 @@ class RepositoryTestRunner(ContainerRunner):
     """Run frozen baseline pytest inputs against a mounted revision."""
 
     async def run(self, workspace: Path, frozen: FrozenRepositoryTests):
+        controller = controller_binding(CONTROLLERS)
         harness = Path(__file__).parent
         inputs = ("repository_pytest_runner.py", "pytest_runner.py", "pytest.ini")
 
         def fingerprint():
             return hashlib.sha256(
-                b"".join((harness / name).read_bytes() for name in inputs)
+                controller.to_dict()["sha256"].encode()
+                + b"".join((harness / name).read_bytes() for name in inputs)
             ).hexdigest()
 
         before, token = fingerprint(), uuid4().hex
@@ -289,10 +300,13 @@ class RepositoryTestRunner(ContainerRunner):
             evaluator_sha256=before,
             evidence_source=SOURCE,
             target_imports=imports,
+            controller_binding=controller.to_dict(),
         )
+        controller.ensure_current()
         return RepositoryExecutionResult(**values)
 
 
+@guard_evaluator(*CONTROLLERS)
 async def run_repository_tests(checkouts, config, image_id, *, runner=None, on_progress=None):
     artifact = {
         "mode": "frozen_baseline",

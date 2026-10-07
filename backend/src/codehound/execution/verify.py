@@ -10,11 +10,23 @@ from codehound.execution.deadlines import current_budget, optional_stage
 from codehound.execution.docker import DockerRunner
 from codehound.execution.independent import IndependentRunner
 from codehound.execution.profiles import TrustedSuite
+from codehound.execution.provenance import bind_source, guard_evaluator
 from codehound.execution.repository_tests import RepositoryTestConfig, run_repository_tests
 from codehound.execution.results import compare_tests, summarize_comparisons
 from codehound.repositories.checkout import GitWorkspace
 from codehound.repositories.urls import parse_pull_url
 
+_SOURCE_BINDING = bind_source(__file__)
+CONTROLLERS = (
+    "execution/verify.py",
+    "execution/independent.py",
+    "execution/docker.py",
+    "execution/profiles.py",
+    "execution/protocol.py",
+    "execution/results.py",
+    "execution/deadlines.py",
+    "execution/repository_tests.py",
+)
 DEADLINE_REASON = "execution_work_budget_exceeded"
 
 
@@ -129,6 +141,7 @@ def comparison(baseline, candidate):
     return compare_tests(baseline, candidate)["verdict"]
 
 
+@guard_evaluator(*CONTROLLERS)
 async def verify_snapshot(
     snapshot,
     suites,
