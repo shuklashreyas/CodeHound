@@ -63,13 +63,16 @@ the other's answer.
 
 | Condition | Result |
 | --- | --- |
-| Both Correct, both High, both cite recorded completed behavioral evidence | Provisional correct |
-| Both Incorrect, both High, both identify the same failure and cite shared completed behavioral evidence | Provisional incorrect |
-| Disagreement, either Unclear, or either below High | Human review |
+| Both Correct, neither Low, both cite recorded completed behavioral evidence | Provisional correct |
+| Both Incorrect, neither Low, both identify the same failure and cite shared completed behavioral evidence | Provisional incorrect |
+| Disagreement, either Unclear, or either Low | Human review |
 | Agreement based only on code inspection, conjecture, or unavailable execution | Human review |
 | A required issue/patch/code inspection is missing | Human review |
 
-This pilot uses the conservative **High/High** threshold. Incorrect agreement
+The requested policy (`--confidence-policy no_low`) allows High/Medium confidence
+combinations and excludes Low. The CLI defaults to the stricter `high_only`
+policy for backwards compatibility. The initial frozen High/High trial remains
+separate from the requested-policy analysis; see the [pilot report](adjudication-2026-10-08.md). Incorrect agreement
 requires matching normalized failure descriptions and a shared runtime evidence
 ID; semantically similar descriptions that do not match still go to review.
 Evidence hashes verify delivery, not the truth of an AI's interpretation.
@@ -131,7 +134,7 @@ PYTHONPATH=backend/src backend/.venv/bin/python -m codehound.benchmark.adjudicat
   --bundles /absolute/path/review-inputs/bundles-frozen.json \
   --reviewer-a /absolute/path/review-runs/reviewer-a.json \
   --reviewer-b /absolute/path/review-runs/reviewer-b.json \
-  --seed codehound-2026-10-08-frozen-v1 --sample-rate 0.2 \
+  --seed codehound-2026-10-08-frozen-v1 --sample-rate 0.2 --confidence-policy no_low \
   --output /absolute/path/review-runs/consensus.json
 ```
 

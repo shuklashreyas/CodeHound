@@ -208,9 +208,20 @@ def inventory(items, field):
     return result
 
 
-def adjudicate(bundles, reviews_a, reviews_b, *, seed="pilot-2026-10-08", sample_rate=0.2):
+def adjudicate(
+    bundles,
+    reviews_a,
+    reviews_b,
+    *,
+    seed="pilot-2026-10-08",
+    sample_rate=0.2,
+    confidence_policy="high_only",
+):
     """Compare independent reviews only after both complete; never create human labels."""
     text(seed, "sampling seed", 300)
+    if not isinstance(confidence_policy, str) or confidence_policy not in {"high_only", "no_low"}:
+        raise ValueError("Confidence policy must be high_only or no_low.")
+    accepted_confidences = {"High"} if confidence_policy == "high_only" else {"High", "Medium"}
     if (
         type(sample_rate) not in {int, float}
         or not math.isfinite(sample_rate)
@@ -237,8 +248,10 @@ def adjudicate(bundles, reviews_a, reviews_b, *, seed="pilot-2026-10-08", sample
             reasons.append("reviewer_disagreement")
         if "Unclear" in {a["verdict"], b["verdict"]}:
             reasons.append("unclear_review")
-        if any(item["confidence"] != "High" for item in (a, b)):
-            reasons.append("not_high_confidence")
+        if any(item["confidence"] not in accepted_confidences for item in (a, b)):
+            reasons.append(
+                "not_high_confidence" if confidence_policy == "high_only" else "low_confidence"
+            )
         if not evidence_a or not evidence_b:
             reasons.append("no_concrete_behavioral_evidence")
         core = {item["id"] for item in bundle["materials"] if item["kind"] in {"issue", "patch"}}
@@ -287,6 +300,7 @@ def adjudicate(bundles, reviews_a, reviews_b, *, seed="pilot-2026-10-08", sample
         "kind": "blinded_ai_reference_adjudication",
         "label_population": "provisional_ai_consensus",
         "human_ground_truth": False,
+        "confidence_policy": confidence_policy,
         "sampling": {
             "seed": seed,
             "rate": sample_rate,
@@ -324,6 +338,10 @@ def reference_metrics(adjudication, validated_report):
         raise ValueError("Only provisional AI adjudication can be scored here.")
     if validated_report.get("kind") != "validated_task_experiment_report":
         raise ValueError("Reference scoring requires a validated task experiment report.")
+    confidence_policy = adjudication.get("confidence_policy", "high_only")
+    if not isinstance(confidence_policy, str) or confidence_policy not in {"high_only", "no_low"}:
+        raise ValueError("Confidence policy must be high_only or no_low.")
+    accepted_confidences = {"High"} if confidence_policy == "high_only" else {"High", "Medium"}
     by_alias = inventory(adjudication["rows"], "adjudication")
     references = {row["patch_id"]: row for row in by_alias.values()}
     if len(references) != len(by_alias):
@@ -355,12 +373,12 @@ def reference_metrics(adjudication, validated_report):
             reference["label_provenance"] != "provisional_ai_consensus"
             or any(
                 review["verdict"].lower() != label
-                or review["confidence"] != "High"
+                or review["confidence"] not in accepted_confidences
                 or any(review[field] != reference[field] for field in IDENTITY)
                 for review in (reference["reviewer_a"], reference["reviewer_b"])
             )
         ):
-            raise ValueError("Reference label differs from its bound high-confidence reviews.")
+            raise ValueError("Reference label differs from its bound confidence-policy reviews.")
         decision = decisions[case_id]
         if reference["case_identity_sha256"] != decision.get("case_identity_sha256"):
             raise ValueError("Reference label binds a different patch identity.")
@@ -395,6 +413,7 @@ def reference_metrics(adjudication, validated_report):
         "kind": "provisional_reference_metrics",
         "label_population": "provisional_ai_consensus",
         "human_ground_truth": False,
+        "confidence_policy": confidence_policy,
         "adjudication_sha256": canonical_sha256(adjudication),
         "validated_report_corpus_sha256": validated_report.get("corpus_sha256"),
         "cases": len(references),
@@ -441,6 +460,7 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--seed", default="pilot-2026-10-08")
     parser.add_argument("--sample-rate", type=float, default=0.2)
+    parser.add_argument("--confidence-policy", choices=("high_only", "no_low"), default="high_only")
     for name in ("corpus", "manifest", "human-reviews"):
         parser.add_argument("--" + name, type=Path)
     args = parser.parse_args()
@@ -450,6 +470,7 @@ def main():
         read_list(args.reviewer_b, "reviews"),
         seed=args.seed,
         sample_rate=args.sample_rate,
+        confidence_policy=args.confidence_policy,
     )
     if args.command == "reference-metrics":
         if any(value is None for value in (args.corpus, args.manifest, args.human_reviews)):

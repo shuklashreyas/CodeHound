@@ -350,3 +350,36 @@ def test_reference_label_cannot_disagree_with_stored_blinded_reviews():
     result["rows"][0]["reference_label"] = "incorrect"
     with pytest.raises(ValueError, match="differs from its bound"):
         reference_metrics(result, report_for(result, ["accept"] * 5))
+
+
+def test_high_medium_agreement_qualifies_under_explicit_no_low_policy():
+    bundles, a, b = cohort(count=5)
+    for item in b:
+        item["confidence"] = "Medium"
+    strict = adjudicate(bundles, a, b)
+    assert strict["summary"]["provisional_labels"] == 0
+    assert strict["confidence_policy"] == "high_only"
+    permissive = adjudicate(bundles, a, b, confidence_policy="no_low")
+    assert permissive["summary"]["provisional_labels"] == 5
+    assert permissive["summary"]["reference_scoring_eligible"] == 4
+    metrics = reference_metrics(permissive, report_for(permissive, ["accept"] * 5))
+    assert metrics["confidence_policy"] == "no_low"
+    assert metrics["confusion"]["tn"] == 4
+
+
+def test_low_confidence_never_qualifies_under_no_low_policy():
+    bundles, a, b = cohort(count=1)
+    b[0]["confidence"] = "Low"
+    result = adjudicate(bundles, a, b, confidence_policy="no_low")
+    assert result["rows"][0]["reference_label"] is None
+    assert "low_confidence" in result["rows"][0]["human_review_reasons"]
+
+
+@pytest.mark.parametrize("policy", ["anything", None, True])
+def test_unknown_confidence_policy_is_rejected_in_consensus_and_scoring(policy):
+    with pytest.raises(ValueError, match="Confidence policy"):
+        adjudicate(*cohort(count=1), confidence_policy=policy)
+    result = adjudicate(*cohort(count=1))
+    result["confidence_policy"] = policy
+    with pytest.raises(ValueError, match="Confidence policy"):
+        reference_metrics(result, report_for(result, ["accept"]))
