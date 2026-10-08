@@ -55,6 +55,10 @@ when interpreting this historic code.
 
 ## Human judgments are a separate input
 
+The [blinded AI adjudication pipeline](ai-adjudication.md) provides a separate
+provisional-reference track using two independent model contexts per patch.
+Its outputs are never imported as human ground truth.
+
 Use the [fixed human-review rubric](human-review.md) for the single-reviewer pilot,
 independent second reviews, and explicit handling of disagreements.
 
