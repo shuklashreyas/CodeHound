@@ -17,7 +17,11 @@ verdicts, earlier AI notes, and other reviewers' answers are excluded.
 A separate collector can add raw original/patched executions of issue-based
 examples. Each artifact includes the executed source, disclosed adaptations,
 stdout, stderr, exit status, image identity, and isolation settings. It contains
-no expected-answer assertions or evaluator judgment. It uses the existing Docker
+no expected-answer assertions or evaluator judgment. A completed process with a
+nonzero exit can supply observed failure evidence; completion does not mean the
+test passed. Timeouts, truncated output, resource failures, and missing runs remain
+unavailable. Reviewers must distinguish task behavior from dependency/setup errors.
+It uses the existing Docker
 execution infrastructure, but does not execute CodeHound's behavioral probes.
 Examples do not establish exhaustive correctness; offline Requests captures do
 not prove actual network behavior. Missing or incomplete executions are explicit.

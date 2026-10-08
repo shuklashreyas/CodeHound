@@ -267,7 +267,7 @@ def test_attach_rejects_stale_artifact_hash(neutral_inputs):
 @pytest.mark.parametrize(
     "changes",
     [
-        {"exit_code": 1},
+        {"exit_code": None},
         {"status": "timeout"},
         {"oom_killed": True},
         {"output_truncated": True},
@@ -296,3 +296,17 @@ def test_checkout_failure_gap_retains_optional_type_as_unavailable(neutral_input
     evidence = result["neutral_evidence"][0]
     assert evidence["status"] == "unavailable"
     assert json.loads(evidence["content"])["gaps"][0]["type"] == "ValueError"
+
+
+def test_observed_baseline_exception_is_evidence_not_missing_execution(neutral_inputs):
+    delivered, artifact, _, manifest, save = neutral_inputs
+    artifact["executions"]["baseline"].update(
+        exit_code=1, stderr="ValueError: issue reproduction fails in original code"
+    )
+    save()
+    result = attach_neutral([delivered], manifest)[0]
+    assert result["neutral_evidence"][0]["status"] == "completed"
+    assert (
+        json.loads(result["neutral_evidence"][0]["content"])["executions"]["baseline"]["exit_code"]
+        == 1
+    )

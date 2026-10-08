@@ -296,7 +296,7 @@ def neutral_runtime(artifact, bundle):
             raise ValueError("Neutral runtime exit code must be integer or missing.")
         completed = completed and (
             run["status"] == "completed"
-            and run["exit_code"] == 0
+            and run["exit_code"] is not None
             and not run["output_truncated"]
             and not run["oom_killed"]
         )
