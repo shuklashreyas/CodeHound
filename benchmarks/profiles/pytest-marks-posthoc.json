@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "name": "Post-hoc pytest metaclass mark compatibility diagnostic",
+  "adapter": "benchmarks/probes/pytest_marks_posthoc_adapter.py",
+  "purpose": "development_pilot",
+  "limitations": [
+    "Post-hoc development diagnostic authored after candidate inspection; excluded from the primary pre-patch experiment.",
+    "Checks marker name presence only; duplicate marker counts and conflicting arguments are outside this diagnostic.",
+    "No human labels or benchmark accuracy are produced."
+  ],
+  "tasks": [
+    {
+      "task_id": "pytest-dev__pytest-10356",
+      "repository": "pytest-dev/pytest",
+      "base_commit": "3c1534944cbd34e8a41bc9e76818018fadefc9a1",
+      "issue_sha256": "04324b4ba13d4d4a7c28e790561dc0927851fc39eb3d245b2e688bb6a0de3174",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "TestMetaUnion": [
+          "bar",
+          "foo"
+        ],
+        "TestMetaSingle": [
+          "foo"
+        ],
+        "TestOrdinaryUnion": [
+          "bar",
+          "foo"
+        ],
+        "TestOrdinarySingle": [
+          "foo"
+        ],
+        "pytest_exit": 0
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "post_patch",
+        "basis": "Authored after reading candidate MRO traversal. Uses the retained issue metaclass pytestmark property workaround adapted to Python 3 and ordinary inheritance controls; compares required marker presence through public pytest collection."
+      },
+      "notes": [
+        "Public pytest.main collection and item.iter_markers observe class marks. The issue workaround derives marks from a metaclass property, without direct class pytestmark dictionary entries.",
+        "Metaclass scenarios check existing workaround compatibility; ordinary scenarios check the issue requested multiple-inheritance improvement.",
+        "Marker names are sorted and deduplicated deliberately to isolate presence rather than the workaround existing duplicate values.",
+        "Source-only pytest version metadata is supplied without candidate setup or source changes."
+      ]
+    }
+  ]
+}

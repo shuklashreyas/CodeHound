@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "name": "Sphinx task-level public builder development probes",
+  "purpose": "development_pilot",
+  "adapter": "benchmarks/probes/sphinx_task_adapter.py",
+  "tasks": [
+    {
+      "task_id": "sphinx-doc__sphinx-10323",
+      "repository": "sphinx-doc/sphinx",
+      "base_commit": "31eba1a76dd485dc633cae48227b46879eda5df4",
+      "issue_sha256": "789a19432537c3948b2c7389aa497711b6ec5a68c9f0d8c3ce2b73eb15f57753",
+      "supported": false,
+      "unsupported_reason": "Literalinclude prepend/append indentation specification and docutils option whitespace parsing require a more precise independent fixture.",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Unsupported cases produce no detection or correctness conclusion."
+      ]
+    },
+    {
+      "task_id": "sphinx-doc__sphinx-10435",
+      "repository": "sphinx-doc/sphinx",
+      "base_commit": "f1061c012e214f16fd8790dec3c283d787e3daa8",
+      "issue_sha256": "a7667cf5cb9cc0846f633b6b55eb826a593b62faeefd644de9e2612875ccac12",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "inline_leading_whitespace": false,
+        "inline_trailing_whitespace": false,
+        "inline_tokens_preserved": true,
+        "block_tokens_preserved": true
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public Sphinx LaTeX builder; inspect generated TeX for semantic leading/trailing whitespace after discarding TeX percent-newline comments.",
+        "Inline and block token preservation are controls; PDF compilation/rendering is not evaluated."
+      ]
+    },
+    {
+      "task_id": "sphinx-doc__sphinx-10449",
+      "repository": "sphinx-doc/sphinx",
+      "base_commit": "36367765fe780f962bba861bf368a765380bbc68",
+      "issue_sha256": "0183a0fabfe0276a52a424fc3c303ad3d0b8b8f67c0ecdfaa6fdaed36028ae66",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "class_return_type_present": false,
+        "class_parameter_width_present": true,
+        "class_parameter_height_present": true,
+        "function_return_type_preserved": true
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public Sphinx HTML builder with autodoc_typehints=description; class constructor must omit return type while retaining both parameter type descriptions.",
+        "Annotated function return type is a regression control."
+      ]
+    },
+    {
+      "task_id": "sphinx-doc__sphinx-10466",
+      "repository": "sphinx-doc/sphinx",
+      "base_commit": "cab2d93076d0cca7c53fac885f927dde3e2a5fec",
+      "issue_sha256": "78f4344e3d2bd2d617628d3b78ad561a400fc79d5c2c9f4269e3b32f907bd4cb",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "repeated_reference_count": 1,
+        "repeated_unique_reference_count": 1,
+        "distinct_location_count": 2,
+        "ordinary_message_preserved": true
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public Sphinx gettext builder with a trusted doctree-read fixture injecting repeated identical source-line paragraphs.",
+        "Distinct source lines for another message and ordinary source text remain present. Source references are counted, not compared to temporary absolute paths."
+      ]
+    },
+    {
+      "task_id": "sphinx-doc__sphinx-10614",
+      "repository": "sphinx-doc/sphinx",
+      "base_commit": "ac2b7599d212af7d04649959ce6926c63c3133fa",
+      "issue_sha256": "59e104221b08590febe6ae868c6d35b4348e5c6fbf023b4806df6d313e88c730",
+      "supported": false,
+      "unsupported_reason": "Graphviz inheritance SVG generation and nested relative hyperlink graphics toolchain are not available in this runtime.",
+      "expected": {},
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Unsupported cases produce no detection or correctness conclusion."
+      ]
+    }
+  ],
+  "limitations": [
+    "No human verdicts or complete-correctness labels are provided.",
+    "Generated LaTeX is checked without compiling a PDF. Graphviz tasks are unsupported.",
+    "Pinned dependency image imports candidate Sphinx source directly without installing or executing repository setup.",
+    "Expectations remain outside candidate containers; emitted observations share a process with candidate code."
+  ]
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/requests-task-level-execution.json",
+    "mapping": "profiles/requests-task-level.json",
+    "adapter": "probes/requests_task_adapter.py"
+  },
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/scientific-task-level-execution.json",
+    "mapping": "profiles/scientific-task-level.json",
+    "adapter": "probes/scientific_task_adapter.py"
+  },
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/pytest-task-level-execution.json",
+    "mapping": "profiles/pytest-task-level.json",
+    "adapter": "probes/pytest_task_adapter.py"
+  },
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/misc-task-level-execution.json",
+    "mapping": "profiles/misc-task-level.json",
+    "adapter": "probes/misc_task_adapter.py"
+  },
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/xarray-task-level-execution.json",
+    "mapping": "profiles/xarray-task-level.json",
+    "adapter": "probes/xarray_task_adapter.py"
+  },
+  {
+    "evidence": "../data/ai-patch-pilot-2026-10-07/sphinx-task-level-execution.json",
+    "mapping": "profiles/sphinx-task-level.json",
+    "adapter": "probes/sphinx_task_adapter.py"
+  }
+]

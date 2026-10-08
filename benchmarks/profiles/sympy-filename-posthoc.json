@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "name": "POST-HOC SymPy caller filename diagnostic",
+  "purpose": "development_pilot",
+  "adapter": "benchmarks/probes/sympy_filename_posthoc_adapter.py",
+  "tasks": [
+    {
+      "task_id": "sympy__sympy-12419",
+      "repository": "sympy/sympy",
+      "base_commit": "479939f8c65c8c2908bbedc959549a257a7c0b0b",
+      "issue_sha256": "48b311ac971aa2fe020b8dd89cd7d2aac3278d4b668921c6b07a29cb914ed4a5",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "ordinary_primary": {
+          "identity_total_symbolic": "n",
+          "orthogonal_total_symbolic": "n",
+          "diagonal_control": "n",
+          "finite_identity_total": "3"
+        },
+        "test_named_primary": {
+          "identity_total_symbolic": "n",
+          "orthogonal_total_symbolic": "n",
+          "diagonal_control": "n",
+          "finite_identity_total": "3"
+        },
+        "ordinary_piecewise": {
+          "nonnegative_index_count": "n",
+          "nonnegative_index_sum": "n*(n - 1)/2"
+        },
+        "test_named_piecewise": {
+          "nonnegative_index_count": "n",
+          "nonnegative_index_sum": "n*(n - 1)/2"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "post_patch",
+        "basis": "Authored after reading retained agent patch containing explicit test_sums_products filename branching; primary four expressions copied from frozen scientific probe, plus simple piecewise range consequences."
+      },
+      "notes": [
+        "Identical source is compiled with ordinary_math.py and test_sums_products.py caller filenames using distinct globals.",
+        "No pytest execution occurs; only Python code object caller filename changes.",
+        "Piecewise expressions are one over nonnegative integer indices and sum of those indices, with count n and arithmetic sum n*(n-1)/2.",
+        "Post-hoc diagnostic cannot contribute to primary accuracy estimates or replace human verdicts."
+      ]
+    }
+  ],
+  "limitations": [
+    "Explicit post-hoc development diagnostic; no human labels.",
+    "SymPy caches and imports share one process; comparison establishes concrete observed behavior only.",
+    "Expectations remain outside candidate container."
+  ]
+}

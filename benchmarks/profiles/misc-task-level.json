@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "name": "Flask, seaborn, and Pylint public task API development probes",
+  "adapter": "benchmarks/probes/misc_task_adapter.py",
+  "purpose": "development_pilot",
+  "tasks": [
+    {
+      "task_id": "pallets__flask-5014",
+      "repository": "pallets/flask",
+      "base_commit": "7ee9ceb71e868944a46e1ff00b506772a53a4f1d",
+      "issue_sha256": "f77d8eab7dd608172aa78b3b50dfa7e0e9b3a6a1c52d14a1cb02417eb5a0ab00",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "empty_name": {
+          "exception": "builtins.ValueError"
+        },
+        "empty_name_with_url_prefix": {
+          "exception": "builtins.ValueError"
+        },
+        "named_blueprint_control": {
+          "registered_names": [
+            "public_probe"
+          ],
+          "status": 200,
+          "body": "public blueprint response"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline source before viewing or executing any agent patch. Expected behavior follows issue requirements and controlled public API inputs."
+      },
+      "notes": [
+        "Requires empty name rejection at Blueprint construction and preserves a registered nonempty blueprint route."
+      ]
+    },
+    {
+      "task_id": "mwaskom__seaborn-3069",
+      "repository": "mwaskom/seaborn",
+      "base_commit": "54cab15bdacfaa05a88fbc5502a5b322d99f148e",
+      "issue_sha256": "739f9b2e6297497555d4d850e066137b282ad7c5bbcdee814e957ef0f81a9b1e",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "explicit_nominal_x": {
+          "limits": [
+            -0.5,
+            2.5
+          ],
+          "grid_visible": false,
+          "inverted": false
+        },
+        "explicit_nominal_y": {
+          "limits": [
+            2.5,
+            -0.5
+          ],
+          "grid_visible": false,
+          "inverted": true
+        },
+        "inferred_nominal_x": {
+          "limits": [
+            -0.5,
+            1.5
+          ],
+          "grid_visible": false,
+          "inverted": false
+        },
+        "inferred_nominal_y": {
+          "limits": [
+            1.5,
+            -0.5
+          ],
+          "grid_visible": false,
+          "inverted": true
+        },
+        "continuous_x_control": {
+          "limits": [
+            -0.1,
+            2.1
+          ],
+          "grid_visible": true,
+          "inverted": false
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline source before viewing or executing any agent patch. Expected behavior follows issue requirements and controlled public API inputs."
+      },
+      "notes": [
+        "Uses public objects Plot APIs with explicit Matplotlib axes initialized with grids enabled; checks three issue-specified categorical axis properties plus continuous-axis behavior.",
+        "Checks explicit and inferred Nominal scales; themes, facets, user limits, and every matplotlib version remain unverified."
+      ]
+    },
+    {
+      "task_id": "pylint-dev__pylint-8898",
+      "repository": "pylint-dev/pylint",
+      "base_commit": "1f8c4d9eb185c16a2c1d881c054f015e1c2eb334",
+      "issue_sha256": "fe9420583d351e0e81a7cbc876fef18b386ba1d375bcfb031830f3885d4f4347",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "quantifier_comma": [
+          {
+            "line": 1,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 2,
+            "symbol": "disallowed-name"
+          }
+        ],
+        "quantifier_and_second_pattern": [
+          {
+            "line": 1,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 2,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 5,
+            "symbol": "disallowed-name"
+          }
+        ],
+        "character_class_comma": [
+          {
+            "line": 1,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 2,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 3,
+            "symbol": "disallowed-name"
+          }
+        ],
+        "ordinary_pattern_control": [
+          {
+            "line": 4,
+            "symbol": "disallowed-name"
+          }
+        ],
+        "two_patterns_control": [
+          {
+            "line": 4,
+            "symbol": "disallowed-name"
+          },
+          {
+            "line": 5,
+            "symbol": "disallowed-name"
+          }
+        ]
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Authored from retained issue text and pinned baseline source before viewing or executing any agent patch. Expected behavior follows issue requirements and controlled public API inputs."
+      },
+      "notes": [
+        "Invokes public pylint.lint.Run with trusted temporary configuration and input module, disables other diagnostics, and inspects public JSONReporter output.",
+        "Checks bounded quantifiers, multiple comma-separated patterns, character-class commas, and controls; arbitrary regular expression grammars remain unverified."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "name": "xarray task-level public API development probes",
+  "purpose": "development_pilot",
+  "adapter": "benchmarks/probes/xarray_task_adapter.py",
+  "tasks": [
+    {
+      "task_id": "pydata__xarray-3095",
+      "repository": "pydata/xarray",
+      "base_commit": "1757dffac2fa493d7b9a074b84cf8c830a706688",
+      "issue_sha256": "3d8f2d8422b56bd5980ec478be1413ef87805484446fc15dbd482342a59abb25",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "dataset_shallow": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "dataset_deep": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "dataarray_shallow": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "dataarray_deep": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "copy_module": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "deepcopy_module": {
+          "index_kind": "U",
+          "index_values": [
+            "foo"
+          ],
+          "values": [
+            "baz"
+          ]
+        },
+        "numeric_control": {
+          "index_kind": "i",
+          "index_values": [
+            0,
+            1
+          ],
+          "values": [
+            1,
+            2
+          ]
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public Dataset/DataArray copy, copy.copy and copy.deepcopy must preserve Unicode index dtype kind and coordinate/data values.",
+        "Numeric-index copy is a regression control."
+      ]
+    },
+    {
+      "task_id": "pydata__xarray-3151",
+      "repository": "pydata/xarray",
+      "base_commit": "118f4d996e7711c9aced916e6049af9f28d5ec66",
+      "issue_sha256": "abcd2e1b10d6d979b0510ec1a37372c9909c15bc786d4b7bb9027facb727d597",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "identical_nonmonotonic": {
+          "x": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "y": [
+            "a",
+            "c",
+            "b"
+          ],
+          "values": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              3,
+              4,
+              5
+            ],
+            [
+              6,
+              7,
+              8
+            ],
+            [
+              9,
+              10,
+              11
+            ]
+          ]
+        },
+        "reversed_inputs": {
+          "x": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "y": [
+            "a",
+            "c",
+            "b"
+          ],
+          "values": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              3,
+              4,
+              5
+            ],
+            [
+              6,
+              7,
+              8
+            ],
+            [
+              9,
+              10,
+              11
+            ]
+          ]
+        },
+        "monotonic_control": {
+          "x": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "y": [
+            "a",
+            "b",
+            "c"
+          ],
+          "values": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              3,
+              4,
+              5
+            ],
+            [
+              6,
+              7,
+              8
+            ],
+            [
+              9,
+              10,
+              11
+            ]
+          ]
+        },
+        "numeric_identical_nonmonotonic": {
+          "x": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "y": [
+            3,
+            1,
+            2
+          ],
+          "values": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              3,
+              4,
+              5
+            ],
+            [
+              6,
+              7,
+              8
+            ],
+            [
+              9,
+              10,
+              11
+            ]
+          ]
+        },
+        "varying_nonmonotonic_rejected": {
+          "exception": "builtins.ValueError"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public combine_by_coords must ignore identical non-varying non-monotonic coordinate dimensions.",
+        "Reverse input order, monotonic coordinates and numeric non-monotonic coordinates are controls. Varying interleaved coordinates must still fail global monotonicity validation."
+      ]
+    },
+    {
+      "task_id": "pydata__xarray-3305",
+      "repository": "pydata/xarray",
+      "base_commit": "69c7e01e5167a3137c285cb50d1978252bb8bcbf",
+      "issue_sha256": "21a3e64aad08beb73b01c601fffd82ad2f9086802463ce389ca5b50f7c271883",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "keep_attrs_true": {
+          "attrs": {
+            "units": "K"
+          },
+          "values": 1.0,
+          "source_attrs": {
+            "units": "K"
+          }
+        },
+        "keep_attrs_false": {
+          "attrs": {},
+          "values": 1.0,
+          "source_attrs": {
+            "units": "K"
+          }
+        },
+        "keep_attrs_default": {
+          "attrs": {},
+          "values": 1.0,
+          "source_attrs": {
+            "units": "K"
+          }
+        },
+        "keep_attrs_true_vector": {
+          "attrs": {
+            "units": "K"
+          },
+          "values": [
+            0.5,
+            1.5
+          ],
+          "source_attrs": {
+            "units": "K"
+          }
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public DataArray.quantile keep_attrs=True preserves units for scalar and vector quantiles.",
+        "False/default attrs, numerical quantiles and unchanged source attrs are controls."
+      ]
+    },
+    {
+      "task_id": "pydata__xarray-3677",
+      "repository": "pydata/xarray",
+      "base_commit": "ef6e6a7b86f8479b9a1fecf15ad5b88a2326b31e",
+      "issue_sha256": "4d1a08fa41ecef39ce23af292d1139cdc7d030bef74172654e29d4876338b716",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "named_scalar": {
+          "a": 0,
+          "b": 1
+        },
+        "top_level_control": {
+          "a": 0,
+          "b": 1
+        },
+        "dataset_control": {
+          "a": 0,
+          "b": 1
+        },
+        "named_vector": {
+          "a": [
+            0,
+            1
+          ],
+          "b": [
+            2,
+            3
+          ]
+        },
+        "compatible_same_name": {
+          "a": 0
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public Dataset.merge accepts a named DataArray and matches top-level merge output.",
+        "Dataset input, vector alignment, and compatible existing variable names are controls."
+      ]
+    },
+    {
+      "task_id": "pydata__xarray-3993",
+      "repository": "pydata/xarray",
+      "base_commit": "8cc34cb412ba89ebca12fc84f76a9e452628f1bc",
+      "issue_sha256": "3d888dbe00aca081458ceccefa5c7b6e323f5d30b3e5f165c668a7cd51260301",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "dataarray_keyword": 7.5,
+        "dataarray_positional": 7.5,
+        "dataset_keyword_control": 7.5,
+        "non_dimension_coordinate": 7.5,
+        "differentiate_keyword_control": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public DataArray.integrate accepts coord keyword consistently with Dataset.integrate.",
+        "Irregular coordinate spacings integrate a linear function to 7.5. Positional API, non-dimension coordinate and differentiate keyword are controls."
+      ]
+    },
+    {
+      "task_id": "pydata__xarray-4075",
+      "repository": "pydata/xarray",
+      "base_commit": "19b088636eb7d3f65ab7a1046ac672e0689371d8",
+      "issue_sha256": "d1cc08eec285573fc56f2a58a623e0b7adf33e6f75fd16b4214dd1db4b3e46a6",
+      "supported": true,
+      "unsupported_reason": null,
+      "expected": {
+        "issue_constant_boolean": {
+          "kind": "finite",
+          "value": 1.0
+        },
+        "nonuniform_boolean": {
+          "kind": "finite",
+          "value": 4.0
+        },
+        "float_weights_control": {
+          "kind": "finite",
+          "value": 4.0
+        },
+        "integer_weights_control": {
+          "kind": "finite",
+          "value": 4.0
+        },
+        "missing_data_boolean": {
+          "kind": "finite",
+          "value": 2.0
+        },
+        "all_false_weights_control": {
+          "kind": "nan"
+        }
+      },
+      "authorship": {
+        "scope": "development",
+        "timing": "pre_patch",
+        "basis": "Retained issue and baseline import/runtime feasibility; no candidate patch or output inspected."
+      },
+      "notes": [
+        "Public DataArray.weighted(...).mean() must normalize boolean weights numerically.",
+        "Nonuniform data, float/integer weights, missing data and all-false undefined means are controls. NaN is explicitly encoded as kind=nan."
+      ]
+    }
+  ],
+  "limitations": [
+    "No human verdicts or complete-correctness labels are provided.",
+    "Public numerical API outputs, values, dtypes and attrs are observed directly; historic repr formatting is not exercised.",
+    "Baseline and candidate are evaluated with the same trusted pinned local runtime.",
+    "Expectations remain outside candidate containers; emitted observations share a process with candidate code."
+  ]
+}
